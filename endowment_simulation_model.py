@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from io import BytesIO
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Callable, Dict, Iterable, Optional, Tuple
 import math
 
 import numpy as np
@@ -214,18 +214,29 @@ def simulate_regime_path(
         raise ValueError(f"Unknown start state {start_state}")
     states = []
     current = start_state
+    # Normalise each transition row once per path (identical draws to per-quarter lookups, much faster).
+    row_probs = {s: _normalize_probabilities(transition_matrix.loc[s, STATE_ORDER].values) for s in STATE_ORDER}
     for q in range(n_quarters):
         if stress_state is not None and q < stress_quarters:
             current = stress_state
         elif q > 0:
-            probs = _normalize_probabilities(transition_matrix.loc[current, STATE_ORDER].values)
+            probs = row_probs[current]
             current = str(rng.choice(STATE_ORDER, p=probs))
         states.append(current)
     return states
 
 
-def _sample_from_condition(rng: np.random.Generator, df: pd.DataFrame, state: str, column: str) -> float:
-    pool = df.loc[df["condition"] == state, column].dropna().to_numpy(dtype=float)
+def _condition_pools(df: pd.DataFrame, column: str) -> Dict[str, np.ndarray]:
+    return {s: df.loc[df["condition"] == s, column].dropna().to_numpy(dtype=float) for s in df["condition"].dropna().unique()}
+
+
+def _sample_from_condition(
+    rng: np.random.Generator, df: pd.DataFrame, state: str, column: str, pools: Optional[Dict[str, np.ndarray]] = None
+) -> float:
+    if pools is not None:
+        pool = pools.get(state, np.empty(0))
+    else:
+        pool = df.loc[df["condition"] == state, column].dropna().to_numpy(dtype=float)
     if pool.size == 0:
         raise ValueError(f"No historical {column} observations for condition {state}")
     return float(rng.choice(pool))
@@ -269,13 +280,15 @@ def sample_quarterly_path(
             stress_state=config.stress_state,
             stress_quarters=config.stress_quarters,
         )
+        ret_pools = _condition_pools(p4, "p4_return")
+        cpi_pools = _condition_pools(data.condition_history, "cpi_yoy")
         rows = []
         for state in states:
             rows.append(
                 {
                     "condition": state,
-                    "p4_return": _sample_from_condition(rng, p4, state, "p4_return"),
-                    "cpi_yoy": _sample_from_condition(rng, data.condition_history, state, "cpi_yoy"),
+                    "p4_return": _sample_from_condition(rng, p4, state, "p4_return", ret_pools),
+                    "cpi_yoy": _sample_from_condition(rng, data.condition_history, state, "cpi_yoy", cpi_pools),
                 }
             )
         return pd.DataFrame(rows)
@@ -304,12 +317,40 @@ def quarterly_to_annual(quarterly_path: pd.DataFrame, start_year: int) -> pd.Dat
     return pd.DataFrame(rows)
 
 
+# Neutral values for the optional per-year stress overrides used by run_path.
+# Every key defaults to "no change", so the validated core mechanics are untouched unless a stress test sets them.
+YEAR_OVERRIDE_DEFAULTS = {
+    "gift_multiplier": 1.0,          # x institutional.gift_rate
+    "spending_rate_add": 0.0,        # + effective_spending_rate (absolute, e.g. 0.01 = +1pp)
+    "other_changes_add": 0.0,        # + other_changes_rate (absolute)
+    "expense_level_shock": 0.0,      # one-off % jump in operating expenses applied at the start of that year
+    "expense_growth_add": 0.0,       # + annual_expense_growth after that year (absolute)
+    "special_draw_rate": 0.0,        # extra outflow from the corpus, % of beginning assets (e.g. emergency appropriation)
+    "capital_call_rate": 0.0,        # liquidity demand, % of beginning assets; moves liquid -> illiquid, no corpus loss
+    "liquid_share_haircut_add": 0.0, # additional haircut on accessible liquid share (only when liquidity is enabled)
+}
+
+
+def _year_override(overrides: Optional[pd.DataFrame], i: int, key: str) -> float:
+    default = YEAR_OVERRIDE_DEFAULTS[key]
+    if overrides is None or key not in overrides.columns or i >= len(overrides):
+        return default
+    value = overrides.iloc[i][key]
+    return default if pd.isna(value) else float(value)
+
+
 def run_path(
     annual_market: pd.DataFrame,
     config: SimulationConfig,
     institutional: InstitutionalParams,
     liquidity: LiquidityParams,
+    year_overrides: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
+    """Roll the endowment forward one year at a time.
+
+    ``year_overrides`` is optional: one row per projection year (row 0 = first year) with any of the
+    columns in ``YEAR_OVERRIDE_DEFAULTS``. When omitted the results are identical to the validated core.
+    """
     if len(annual_market) != config.horizon_years:
         raise ValueError("Annual market path length must match horizon_years")
 
@@ -326,13 +367,20 @@ def run_path(
         portfolio_return = float(market["portfolio_return"])
         inflation = float(market["inflation"])
 
+        ov = {k: _year_override(year_overrides, i, k) for k in YEAR_OVERRIDE_DEFAULTS}
+        if ov["expense_level_shock"] != 0.0:
+            expenses *= (1.0 + ov["expense_level_shock"])
+
         beginning = current
         investment_gain = beginning * portfolio_return
-        gifts = beginning * institutional.gift_rate
-        other_changes = beginning * institutional.other_changes_rate
+        gifts = beginning * institutional.gift_rate * max(0.0, ov["gift_multiplier"])
+        other_changes = beginning * (institutional.other_changes_rate + ov["other_changes_add"])
         pre_payout = beginning + investment_gain + gifts + other_changes
+        special_draw = max(0.0, beginning * ov["special_draw_rate"])
+        capital_call = max(0.0, beginning * ov["capital_call_rate"])
 
-        planned_payout = float(np.mean(history[-3:]) * institutional.effective_spending_rate)
+        spending_rate = max(0.0, institutional.effective_spending_rate + ov["spending_rate_add"])
+        planned_payout = float(np.mean(history[-3:]) * spending_rate)
 
         liquid_assets = pre_payout * liquidity.liquid_share
         illiquid_assets = pre_payout * liquidity.illiquid_share
@@ -343,11 +391,15 @@ def run_path(
         other_cash_need = 0.0
 
         if liquidity.enabled:
-            effective_liquid_share = float(np.clip(liquidity.liquid_share * (1.0 - liquidity.liquid_share_haircut), 0.0, 1.0))
+            haircut = float(np.clip(liquidity.liquid_share_haircut + ov["liquid_share_haircut_add"], 0.0, 1.0))
+            effective_liquid_share = float(np.clip(liquidity.liquid_share * (1.0 - haircut), 0.0, 1.0))
             liquid_assets = pre_payout * effective_liquid_share
             illiquid_assets = pre_payout * liquidity.illiquid_share
             other_cash_need = max(0.0, float(liquidity.other_annual_cash_need))
-            required_liquidity = planned_payout * max(0.0, liquidity.liquidity_buffer_years) + other_cash_need
+            # Special draws and capital calls compete with the payout for liquid assets.
+            required_liquidity = (
+                planned_payout * max(0.0, liquidity.liquidity_buffer_years) + other_cash_need + special_draw + capital_call
+            )
             # Reserve and other annual cash needs must be met before the payout is funded from highly liquid assets.
             payout_cash_capacity = max(0.0, liquid_assets - required_liquidity)
             liquidity_shortfall = max(0.0, planned_payout - payout_cash_capacity)
@@ -364,7 +416,7 @@ def run_path(
         else:
             actual_payout = planned_payout
 
-        ending = pre_payout - actual_payout - forced_sale_loss - other_cash_need
+        ending = pre_payout - actual_payout - forced_sale_loss - other_cash_need - special_draw
         ending = max(0.0, ending)
 
         required_support = expenses * institutional.support_ratio
@@ -402,6 +454,9 @@ def run_path(
                 "forced_sale": forced_sale,
                 "forced_sale_loss": forced_sale_loss,
                 "other_annual_cash_need": other_cash_need,
+                "special_draw": special_draw,
+                "capital_call": capital_call,
+                "effective_spending_rate": spending_rate,
                 "ending_assets": ending,
                 "operating_expenses": expenses,
                 "required_support": required_support,
@@ -423,7 +478,7 @@ def run_path(
 
         history.append(ending)
         current = ending
-        expenses *= (1.0 + institutional.annual_expense_growth)
+        expenses *= (1.0 + institutional.annual_expense_growth + ov["expense_growth_add"])
 
     return pd.DataFrame(out)
 
@@ -483,15 +538,24 @@ def run_monte_carlo(
     liquidity: LiquidityParams,
     p4_history: Optional[pd.DataFrame] = None,
     keep_paths: bool = True,
+    path_transform: Optional[Callable[[np.random.Generator, pd.DataFrame], pd.DataFrame]] = None,
+    year_overrides: Optional[pd.DataFrame] = None,
 ) -> Dict[str, object]:
+    """Monte Carlo engine.
+
+    ``path_transform`` (optional) receives each sampled quarterly market path and returns a stressed copy.
+    ``year_overrides`` (optional) is passed to ``run_path``. Both default to None = unchanged baseline behaviour.
+    """
     rng = np.random.default_rng(config.seed)
     annual_records = []
     path_records = []
 
     for path_id in range(config.n_sims):
         qpath = sample_quarterly_path(rng, data, config, p4_history=p4_history)
+        if path_transform is not None:
+            qpath = path_transform(rng, qpath)
         annual_market = quarterly_to_annual(qpath, config.start_year)
-        path = run_path(annual_market, config, institutional, liquidity)
+        path = run_path(annual_market, config, institutional, liquidity, year_overrides=year_overrides)
         path.insert(0, "path_id", path_id)
         if keep_paths:
             annual_records.append(path)
@@ -515,6 +579,9 @@ def run_monte_carlo(
                 "support_gap_years": int((path["payout_support_gap"] > 0).sum()),
                 "total_support_gap": float(path["payout_support_gap"].sum()),
                 "insolvent": int(path["insolvent"].any()),
+                "total_payout": float(path["actual_payout"].sum()),
+                "first_year_payout": float(path["actual_payout"].iloc[0]),
+                "min_payout_adequacy": float(path["payout_adequacy_ratio"].min()),
             }
         )
 

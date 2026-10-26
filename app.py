@@ -21,6 +21,7 @@ from endowment_simulation_model import (
     stress_configs,
     summarize_path,
 )
+from stress_tab import render_stress_tab
 
 
 st.set_page_config(page_title="Endowment Payout-Risk Simulation", page_icon="📊", layout="wide")
@@ -134,7 +135,7 @@ def simulation_controls(data, cfg_default, inst_default, liq_default):
 data = load_data_cached()
 
 st.title("Endowment Payout-Risk Simulation Model")
-st.caption("R1 P4 investment calibration + R2 institutional benchmarks + Monte Carlo / stress simulation")
+st.caption("R1 P4 investment calibration + R2 institutional benchmarks + Monte Carlo simulation + market / endowment stress testing")
 
 with st.expander("Model scope and current limitations", expanded=False):
     st.markdown(
@@ -142,6 +143,7 @@ with st.expander("Model scope and current limitations", expanded=False):
         - **Validated core:** investment return roll-forward, gifts, other endowment changes, 3-year moving-average payout, expenses, required support, inflation/real corpus and drawdowns.
         - **Simulation baseline:** quarterly block bootstrap or R1 regime-switching bootstrap.
         - **Selected payout-risk measures:** payout shortfall frequency, payout shortfall depth, and Expected Shortfall of terminal real-corpus loss.
+        - **Stress testing:** historical replays, asset-class shocks, stagflation / lost-decade paths, gift, spending, expense, special-draw and liquidity shocks, reverse stress test and sensitivity grid.
         - **Liquidity mechanics are scenario assumptions**, not finalized R2/D2 policy benchmarks. They are off by default.
         - P4 is the current interim R1 Medium | Normal portfolio until the seven-cohort portfolio rebuild is delivered.
         """
@@ -164,7 +166,7 @@ cfg, inst, liq = simulation_controls(data, base_cfg, base_inst, base_liq)
 validation_tab, mc_tab, stress_tab, assumptions_tab = st.tabs([
     "Historical validation",
     "Monte Carlo simulation",
-    "Stress comparison",
+    "Stress testing",
     "Assumptions & data",
 ])
 
@@ -265,51 +267,7 @@ with mc_tab:
         )
 
 with stress_tab:
-    st.subheader("Stress comparison")
-    st.caption("Compares the same model under baseline, a forced Recession start, and a forced Elevated Inflation start. Stress duration is configurable and uses R1 historical condition-specific return/inflation observations rather than arbitrary return shocks.")
-
-    c1, c2, c3 = st.columns(3)
-    recession_q = c1.slider("Recession stress duration (quarters)", 1, 12, 6)
-    inflation_q = c2.slider("Elevated-inflation stress duration (quarters)", 1, 16, 8)
-    stress_sims = c3.selectbox("Paths per stress case", [500, 1000, 2000, 3000], index=1)
-
-    run_stress = st.button("Run stress comparison", key="run_stress")
-    if run_stress:
-        table = []
-        with st.spinner("Running stress cases..."):
-            base_for_stress = replace(cfg, n_sims=int(stress_sims), stress_state=None, stress_quarters=0)
-            for label, scfg in stress_configs(base_for_stress, recession_q, inflation_q).items():
-                res = run_monte_carlo(data, scfg, inst, liq, p4_history=custom_history, keep_paths=True)
-                m = res["metrics"]
-                table.append(
-                    {
-                        "Scenario": label,
-                        "Median terminal nominal ($mm)": m["median_terminal_nominal_assets"],
-                        "Median terminal real ($mm)": m["median_terminal_real_assets"],
-                        "Payout shortfall probability": m["annual_shortfall_probability"],
-                        "Pr(≥1 payout shortfall)": m["probability_at_least_one_shortfall"],
-                        "Average relative shortfall depth": m["average_relative_shortfall_depth"],
-                        f"VaR {int(cfg.alpha*100)}% real-corpus loss": m["var_terminal_real_corpus_loss"],
-                        f"ES {int(cfg.alpha*100)}% real-corpus loss": m["expected_shortfall_terminal_real_corpus_loss"],
-                        "Pr(any support gap)": m["probability_any_support_gap"],
-                    }
-                )
-        stress_df = pd.DataFrame(table)
-        st.session_state["stress_df"] = stress_df
-
-    stress_df = st.session_state.get("stress_df")
-    if stress_df is not None:
-        formatted = stress_df.copy()
-        for col in formatted.columns:
-            if col == "Scenario":
-                continue
-            if "($mm)" in col:
-                formatted[col] = formatted[col].map(lambda x: f"{x:,.2f}")
-            else:
-                formatted[col] = formatted[col].map(lambda x: f"{x:.2%}")
-        st.dataframe(formatted, use_container_width=True, hide_index=True)
-        st.bar_chart(stress_df.set_index("Scenario")[["Median terminal real ($mm)"]])
-        st.download_button("Download stress comparison", stress_df.to_csv(index=False).encode("utf-8"), "stress_comparison.csv", "text/csv")
+    render_stress_tab(data, cfg, inst, liq, custom_history)
 
 with assumptions_tab:
     st.subheader("R2 scenario parameters")
