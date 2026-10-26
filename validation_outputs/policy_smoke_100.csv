@@ -1,0 +1,5 @@
+Scenario,Annual return-coverage shortfall,Pr(any payout funding shortfall),Annual payout funding shortfall,Conditional funding depth,Median longest coverage spell (years),Median longest funding spell (years),Pr(real corpus erosion),Median terminal real corpus ($M),Median cumulative real payouts ($M),Terminal real-corpus ES,Pr(unpaid other obligation)
+Anchor policy,0.408,0.0,0.0,0.0,2.0,0.0,0.64,179.92836576024115,73.54996802842632,0.4655508579529447,0.0
+Current-assets spending,0.412,0.0,0.0,0.0,2.0,0.0,0.64,176.59107593515208,75.91031360145494,0.4545072957281399,0.0
+Alternative spending rate,0.382,0.0,0.0,0.0,2.0,0.0,0.63,195.83273248556458,62.15674162123037,0.4092951377605278,0.0
+Reserve buffer,0.408,0.0,0.0,0.0,2.0,0.0,0.64,179.92836576024112,73.54996802842632,0.46555085795294476,0.0

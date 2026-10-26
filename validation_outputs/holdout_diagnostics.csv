@@ -1,0 +1,3 @@
+Model,Mean holdout log density (higher is better),Training start,Training end,Holdout start,Holdout end,Training quarters,Holdout quarters
+Single Normal,1.0704399534325728,2007Q1,2018Q2,2018Q3,2023Q2,46,20
+Two-component Normal mixture,1.1672677760957484,2007Q1,2018Q2,2018Q3,2023Q2,46,20
