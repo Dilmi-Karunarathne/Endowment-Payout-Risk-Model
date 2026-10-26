@@ -52,6 +52,11 @@ class SimulationConfig:
     starting_regime: str = "Normal"
     stress_state: Optional[str] = None
     stress_quarters: int = 0
+    # Shared future scenario: shift annual arithmetic mean, scale deviations.
+    annual_return_shift: float = 0.0
+    volatility_multiplier: float = 1.0
+    # None preserves historical inflation sampling; a number fixes annual CPI.
+    annual_inflation: Optional[float] = None
 
 
 @dataclass
@@ -236,10 +241,39 @@ def sample_quarterly_path(
     data: ModelData,
     config: SimulationConfig,
     p4_history: Optional[pd.DataFrame] = None,
+    mixture_parameters=None,
 ) -> pd.DataFrame:
     p4 = data.p4_quarterly if p4_history is None else p4_history.copy()
     n_quarters = int(config.horizon_years * 4)
     method = config.return_method.lower()
+
+    def finish(path):
+        # Same scenario transformation for every return method.
+        center = float(p4["p4_return"].mean())
+        path["p4_return"] = (center + config.volatility_multiplier *
+            (path["p4_return"] - center) + config.annual_return_shift / 4.0)
+        if (path["p4_return"] <= -1).any():
+            raise ValueError("Scenario produced returns <= -100%; reduce scenario severity.")
+        if config.annual_inflation is not None:
+            path["cpi_yoy"] = config.annual_inflation
+        return path.reset_index(drop=True)
+
+    if "mixture" in method:
+        from portfolio_return_simulation import fit_mixture, sample_mixture
+        parameters = mixture_parameters if mixture_parameters is not None else fit_mixture(p4["p4_return"].to_numpy())
+        path = pd.DataFrame({
+            "p4_return": sample_mixture(rng, n_quarters, parameters),
+            "condition": "Portfolio mixture",
+            # No estimated return/inflation dependence in this simple mixture.
+            "cpi_yoy": float(p4["cpi_yoy"].mean()),
+        })
+        if config.stress_state and config.stress_quarters > 0:
+            for q in range(min(config.stress_quarters, n_quarters)):
+                state = config.stress_state
+                path.loc[q, "condition"] = state
+                path.loc[q, "p4_return"] = _sample_from_condition(rng, p4, state, "p4_return")
+                path.loc[q, "cpi_yoy"] = _sample_from_condition(rng, data.condition_history, state, "cpi_yoy")
+        return finish(path)
 
     if "block" in method:
         block = max(1, int(config.block_size_quarters))
@@ -258,7 +292,7 @@ def sample_quarterly_path(
                 path.loc[q, "condition"] = state
                 path.loc[q, "p4_return"] = _sample_from_condition(rng, p4, state, "p4_return")
                 path.loc[q, "cpi_yoy"] = _sample_from_condition(rng, data.condition_history, state, "cpi_yoy")
-        return path.reset_index(drop=True)
+        return finish(path)
 
     if "regime" in method:
         states = simulate_regime_path(
@@ -278,7 +312,7 @@ def sample_quarterly_path(
                     "cpi_yoy": _sample_from_condition(rng, data.condition_history, state, "cpi_yoy"),
                 }
             )
-        return pd.DataFrame(rows)
+        return finish(pd.DataFrame(rows))
 
     raise ValueError(f"Unsupported return method: {config.return_method}")
 
@@ -484,12 +518,27 @@ def run_monte_carlo(
     p4_history: Optional[pd.DataFrame] = None,
     keep_paths: bool = True,
 ) -> Dict[str, object]:
+    from portfolio_return_simulation import checked_history, fit_mixture
+    history = checked_history(data.p4_quarterly if p4_history is None else p4_history)
+    if config.n_sims < 1 or config.horizon_years < 1:
+        raise ValueError("Use a positive simulation count and horizon.")
+    if not 1 <= config.block_size_quarters <= len(history):
+        raise ValueError("Block size must fit within the history.")
+    if config.volatility_multiplier <= 0 or (config.annual_inflation is not None and config.annual_inflation <= -1):
+        raise ValueError("Invalid volatility or inflation assumption.")
+    mixture = fit_mixture(history["p4_return"].to_numpy()) if "mixture" in config.return_method.lower() else None
     rng = np.random.default_rng(config.seed)
+    quarterly_returns = []
+    investment_drawdowns = []
     annual_records = []
     path_records = []
 
     for path_id in range(config.n_sims):
-        qpath = sample_quarterly_path(rng, data, config, p4_history=p4_history)
+        qpath = sample_quarterly_path(rng, data, config, p4_history=history, mixture_parameters=mixture)
+        returns = qpath["p4_return"].to_numpy()
+        quarterly_returns.append(returns)
+        wealth = np.r_[1.0, np.cumprod(1.0 + returns)]
+        investment_drawdowns.append(float((wealth / np.maximum.accumulate(wealth) - 1).min()))
         annual_market = quarterly_to_annual(qpath, config.start_year)
         path = run_path(annual_market, config, institutional, liquidity)
         path.insert(0, "path_id", path_id)
@@ -529,7 +578,13 @@ def run_monte_carlo(
         else pd.DataFrame(columns=["year", "shortfall_probability"])
     )
 
+    returns_flat = np.concatenate(quarterly_returns)
+    tail_count = max(1, int(math.ceil(0.05 * len(returns_flat))))
     metrics = {
+        "negative_quarter_probability": float((returns_flat < 0).mean()),
+        "p05_quarterly_return": float(np.quantile(returns_flat, 0.05)),
+        "quarterly_tail_mean": float(np.sort(returns_flat)[:tail_count].mean()),
+        "median_investment_drawdown": float(np.median(investment_drawdowns)),
         "n_sims": int(config.n_sims),
         "alpha": float(config.alpha),
         "median_terminal_nominal_assets": float(path_summary["terminal_nominal_assets"].median()),
