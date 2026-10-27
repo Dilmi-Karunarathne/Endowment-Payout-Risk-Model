@@ -1,4 +1,8 @@
-"""Streamlit UI for the stress-testing lab (rendered inside the 'Stress testing' tab of app.py)."""
+"""Streamlit UI for the Stress testing tab of app.py.
+
+The tab leads with the two R3 framework scenarios (high inflation & elevated rates; prolonged downturn &
+liquidity squeeze). The earlier exploratory scenario library, custom builder, reverse stress test and
+sensitivity grid are still available behind a toggle."""
 from __future__ import annotations
 
 from dataclasses import replace
@@ -10,6 +14,15 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from stress_testing import (
+    R3_EVIDENCE_SOURCES,
+    SCENARIO_1,
+    SCENARIO_2,
+    DownturnLiquidityParams,
+    InflationRatesParams,
+    default_cpi_add,
+    liquidity_breaking_point,
+    run_r3_framework,
+    variable_impact_table,
     EQUITY_CRASH_SHOCKS,
     EndowmentShock,
     MarketShock,
@@ -171,8 +184,8 @@ def _scenario_library_view(data, lib):
                "Historical replays use actual R1 P4 quarterly returns and CPI.")
 
 
-def render_stress_tab(data, cfg, inst, liq, custom_history=None):
-    st.subheader("Stress testing: market scenarios and endowment shocks")
+def _render_exploratory(data, cfg, inst, liq, custom_history=None):
+    st.markdown("### Additional exploratory scenarios")
     st.caption(
         "Each scenario overlays market shocks (historical replays, asset-class shocks, return drag, inflation, forced regimes) "
         "and/or endowment shocks (gifts, spending, expenses, special draws, liquidity) on the same model. All scenarios use "
@@ -339,3 +352,262 @@ def render_stress_tab(data, cfg, inst, liq, custom_history=None):
         st.plotly_chart(fig, use_container_width=True)
         st.caption(f"Deterministic path. Current R2 spending rate: {inst.effective_spending_rate:.2%}. "
                    "Green = corpus preserved / higher payout; red = erosion.")
+
+
+# ---------------------------------------------------------------------------
+# R3 stress-scenario framework view
+# ---------------------------------------------------------------------------
+
+S1_COLS = ["Cumulative real payout ($mm)", "Δ real payout vs baseline", "Real payout, first 3 yrs ($mm)",
+           "Pr(any support gap)", "Total support gap ($mm)", "Avg payout adequacy"]
+S2_COLS = ["Pr(≥1 payout shortfall)", "Avg shortfall depth", "Pr(forced sale)", "Mean forced-sale loss ($mm)",
+           "Lowest liquidity coverage (median)", "Liquidity constraints"]
+
+
+def _fmt_focus(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    for col in out.columns:
+        if col in ("Scenario", "Liquidity constraints"):
+            continue
+        if "($mm)" in col:
+            out[col] = out[col].map(lambda x: f"{x:,.2f}" if pd.notna(x) else "—")
+        elif "coverage" in col.lower():
+            out[col] = out[col].map(lambda x: f"{x:.1f}x" if pd.notna(x) else "off")
+        else:
+            out[col] = out[col].map(lambda x: f"{x:.1%}" if pd.notna(x) else "—")
+    return out
+
+
+def _fmt_impact(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    year_cols = [c for c in out.columns if c.isdigit()]
+    out[year_cols] = out[year_cols].astype(object)
+    for i, row in df.iterrows():
+        for c in year_cols:
+            v = row[c]
+            if pd.isna(v):
+                out.at[i, c] = "—"
+            elif row["Unit"] == "pct":
+                out.at[i, c] = f"{v:.1%}"
+            elif row["Unit"] == "x":
+                out.at[i, c] = f"{v:.1f}x"
+            else:
+                out.at[i, c] = f"{v:,.2f}"
+    return out.drop(columns=["Unit"])
+
+
+def _s1_controls(data, horizon):
+    d = InflationRatesParams()
+    st.caption("Severity: actual 2022 P4 returns and CPI (stocks and bonds fell together as rates rose). "
+               "Recovery: R1 transition matrix after the stress window.")
+    a, b = st.columns(2)
+    elevated_q = a.slider("Duration in Elevated-inflation regime (quarters, incl. 2022 replay)", 4, 24, d.elevated_quarters,
+                          help="Default 16 = the 2021Q2-2025Q1 elevated-inflation spell in the CPI history.")
+    cpi_add = a.slider("Extra CPI after the replay (pp)", 0.0, 0.05, round(default_cpi_add(data), 3), 0.001, format="%.3f",
+                       help="Default lifts post-replay CPI from the all-history elevated-regime average to the 2021-25 spell average.")
+    exp_g = b.slider("Operating-expense growth during stress", 0.02, 0.08, d.expense_growth, 0.001, format="%.3f",
+                     help="Default 4.7% = average of Commonfund HEPI FY2022 (5.2%) and FY2023 (4.1%).")
+    exp_y = b.slider("Expense-stress duration (years)", 0, min(10, horizon), d.expense_years)
+    c, e = st.columns(2)
+    drag = c.slider("Extra cost-of-capital return drag (per year, after replay)", -0.04, 0.0, 0.0, 0.005, format="%.3f",
+                    help="Optional. The 2022 replay already includes the rate-driven repricing.")
+    drag_y = e.slider("Return-drag duration (years)", 0, min(10, horizon), 0)
+    return InflationRatesParams(elevated_quarters=int(elevated_q), cpi_add=float(cpi_add), expense_growth=float(exp_g),
+                                expense_years=int(exp_y), return_drag=float(drag), drag_years=int(drag_y))
+
+
+def _s2_controls(horizon):
+    d = DownturnLiquidityParams()
+    st.caption("Severity: actual GFC P4 path 2008Q1-2009Q2 (-22.0%). Liquidity constraints are switched ON for this scenario.")
+    a, b = st.columns(2)
+    rec_drag = a.slider("Slow-recovery return drag (per year, after replay)", -0.06, 0.0, d.recovery_drag, 0.005, format="%.3f",
+                        help="Assumption: P4 rebounded quickly after 2009Q2; the drag tests a prolonged downturn.")
+    rec_y = a.slider("Slow-recovery duration (years)", 0, min(10, horizon), d.recovery_years)
+    gift = b.slider("Gifts as share of normal", 0.5, 1.0, d.gift_multiplier, 0.01,
+                    help="Default 0.88 = giving to colleges fell 11.9% in FY2009 (CAE VSE).")
+    gift_y = b.slider("Gift-shock duration (years)", 0, min(10, horizon), d.gift_years)
+    st.markdown("**Liquidity squeeze**")
+    c, e, f = st.columns(3)
+    drain = c.slider("Net private cash drain (% of corpus / yr)", 0.0, 0.12, d.private_cash_drain, 0.005, format="%.3f",
+                     help="Capital calls continue while private distributions are delayed.")
+    drain_y = c.slider("Cash-drain duration (years)", 0, min(10, horizon), d.drain_years)
+    haircut = e.slider("Liquid assets unavailable for payout", 0.0, 0.95, d.liquid_haircut, 0.05,
+                       help="Share of the liquid book held back for rebalancing, collateral or because of depressed prices.")
+    haircut_y = e.slider("Haircut duration (years)", 0, min(10, horizon), d.haircut_years)
+    buffer = f.number_input("Liquidity reserve (years of payout)", 0.0, 3.0, d.buffer_years, 0.25)
+    disc = f.slider("Forced-sale discount on illiquid assets", 0.0, 0.6, d.forced_sale_discount, 0.01,
+                    help="Secondary bids were still ~80% of NAV in H1 2010, after the recovery; trough discounts were deeper.")
+    forced = f.checkbox("Allow forced sales (otherwise the payout is cut)", value=d.allow_forced_sales)
+    return DownturnLiquidityParams(recovery_drag=float(rec_drag), recovery_years=int(rec_y), gift_multiplier=float(gift),
+                                   gift_years=int(gift_y), private_cash_drain=float(drain), drain_years=int(drain_y),
+                                   liquid_haircut=float(haircut), haircut_years=int(haircut_y), buffer_years=float(buffer),
+                                   forced_sale_discount=float(disc), allow_forced_sales=bool(forced))
+
+
+def _year_median(results, column):
+    frames = []
+    for name, res in results.items():
+        ar = res["annual_results"]
+        if ar.empty or column not in ar.columns or ar[column].isna().all():
+            continue
+        x = ar.groupby("year")[column].median().reset_index()
+        x["Scenario"] = name
+        frames.append(x)
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def render_stress_tab(data, cfg, inst, liq, custom_history=None):
+    st.subheader("Stress testing: R3 stress-scenario framework")
+    st.caption("Goal: evaluate payout sustainability under two major adverse economic regimes. Both scenarios run "
+               "against the same baseline with the same random seed, so differences come from the stress, not sampling noise.")
+
+    horizon = int(cfg.horizon_years)
+    c1, c2 = st.columns(2)
+    with c1:
+        use1 = st.checkbox(SCENARIO_1, value=True)
+        st.caption("**Conditions:** high inflation, rising cost of capital, elevated operating expenses.  \n"
+                   "**Focus:** maintaining real payout value and meeting institutional funding needs.")
+    with c2:
+        use2 = st.checkbox(SCENARIO_2, value=True)
+        st.caption("**Conditions:** market losses, delayed private distributions, illiquid asset sales.  \n"
+                   "**Focus:** meeting required payouts while minimising forced-sale asset losses.")
+
+    with st.expander("Scenario 1 shock parameters (severity, duration, recovery)", expanded=False):
+        p1 = _s1_controls(data, horizon)
+    with st.expander("Scenario 2 shock parameters (severity, duration, recovery, liquidity)", expanded=False):
+        p2 = _s2_controls(horizon)
+
+    r1, r2 = st.columns([1, 3])
+    n_paths = r1.selectbox("Paths per scenario", [250, 500, 1000, 2000], index=1, key="r3_paths")
+    include = [n for n, on in ((SCENARIO_1, use1), (SCENARIO_2, use2)) if on]
+    r2.write("")
+    run = r2.button("Run R3 stress scenarios", type="primary", key="run_r3", disabled=not include)
+    if not include:
+        st.info("Select at least one scenario.")
+
+    if run and include:
+        run_cfg = replace(cfg, n_sims=int(n_paths), stress_state=None, stress_quarters=0)
+        bar = st.progress(0.0, text="Running scenarios…")
+        out = run_r3_framework(data, run_cfg, inst, liq, p1, p2, include=include, p4_history=custom_history,
+                               progress=lambda f, name: bar.progress(f, text=f"Finished {name}"))
+        out["breaking"] = (liquidity_breaking_point(data, run_cfg, inst, liq, p2, p4_history=custom_history)
+                           if SCENARIO_2 in include else None)
+        out["include"] = include
+        bar.empty()
+        st.session_state["r3"] = out
+
+    res = st.session_state.get("r3")
+    if res is not None:
+        focus = res["focus"]
+        base = focus.iloc[0]
+        st.markdown("#### Headline results")
+        if SCENARIO_1 in res["include"]:
+            r = focus.set_index("Scenario").loc[SCENARIO_1]
+            st.markdown(f"**{SCENARIO_1}**")
+            m = st.columns(4)
+            m[0].metric("Cumulative real payout", f"${r['Cumulative real payout ($mm)']:,.1f}M",
+                        f"{r['Δ real payout vs baseline']:.1%} vs baseline")
+            m[1].metric("Pr(any support gap)", f"{r['Pr(any support gap)']:.0%}",
+                        f"{r['Pr(any support gap)'] - base['Pr(any support gap)']:+.0%} vs baseline", delta_color="inverse")
+            m[2].metric("Total support gap (median)", f"${r['Total support gap ($mm)']:,.1f}M")
+            m[3].metric("Median terminal real corpus", f"${r['Median terminal real ($mm)']:,.1f}M",
+                        f"{r['Δ median real vs baseline']:.1%} vs baseline")
+        if SCENARIO_2 in res["include"]:
+            r = focus.set_index("Scenario").loc[SCENARIO_2]
+            st.markdown(f"**{SCENARIO_2}**")
+            m = st.columns(4)
+            m[0].metric("Pr(≥1 payout shortfall)", f"{r['Pr(≥1 payout shortfall)']:.0%}",
+                        f"avg depth {r['Avg shortfall depth']:.1%}", delta_color="off")
+            m[1].metric("Pr(forced sale)", f"{r['Pr(forced sale)']:.0%}")
+            m[2].metric("Mean forced-sale loss", f"${r['Mean forced-sale loss ($mm)']:,.2f}M")
+            cov = r["Lowest liquidity coverage (median)"]
+            m[3].metric("Lowest liquidity coverage", f"{cov:.1f}x" if pd.notna(cov) else "—",
+                        help="Cash available for the payout ÷ planned payout, at its worst year (median path). Below 1x, "
+                             "forced sales or payout cuts are needed.")
+            b = res.get("breaking")
+            if b:
+                h, dr = b["breaking_haircut"], b["breaking_cash_drain"]
+                st.caption(
+                    "**Liquidity breaking point (deterministic path):** forced sales or payout cuts begin once "
+                    + (f"**{h:.0%}** of liquid assets are unavailable" if pd.notna(h) else "no haircut up to 100% is enough")
+                    + " (other settings unchanged), or once the net private cash drain reaches "
+                    + (f"**{dr:.1%}** of the corpus per year." if pd.notna(dr) else "more than 50% of the corpus per year."))
+
+        st.markdown("#### Scenario 1 focus: real payout value and funding needs")
+        st.dataframe(_fmt_focus(focus[["Scenario"] + S1_COLS]), use_container_width=True, hide_index=True)
+        st.markdown("#### Scenario 2 focus: required payouts and forced-sale losses")
+        st.dataframe(_fmt_focus(focus[["Scenario"] + S2_COLS]), use_container_width=True, hide_index=True)
+        st.markdown("#### Corpus risk (both scenarios)")
+        corpus_cols = ["Median terminal real ($mm)", "Δ median real vs baseline", "5th pct terminal real ($mm)",
+                       "Pr(real corpus < initial)", [c for c in focus.columns if c.startswith("ES ")][0]]
+        st.dataframe(_fmt_focus(focus[["Scenario"] + corpus_cols]), use_container_width=True, hide_index=True)
+
+        left, right = st.columns(2)
+        with left:
+            rp = _year_median(res["results"], "real_payout")
+            fig = px.line(rp, x="year", y="real_payout", color="Scenario", markers=True,
+                          labels={"real_payout": "Median real payout ($mm)", "year": ""}, title="Real payout value by year")
+            fig.update_layout(margin=dict(l=10, r=10, t=40, b=10), legend=dict(orientation="h", y=-0.2), legend_title_text="")
+            st.plotly_chart(fig, use_container_width=True)
+        with right:
+            paths = res["paths"]
+            fig = px.line(paths, x="year", y="p50", color="Scenario", markers=True,
+                          labels={"p50": "Median real ending assets ($mm)", "year": ""}, title="Real endowment by year")
+            fig.add_hline(y=float(cfg.initial_endowment), line_dash="dot", annotation_text="Initial corpus")
+            fig.update_layout(margin=dict(l=10, r=10, t=40, b=10), legend=dict(orientation="h", y=-0.2), legend_title_text="")
+            st.plotly_chart(fig, use_container_width=True)
+
+        left, right = st.columns(2)
+        with left:
+            gap_mean = []
+            for name, rr in res["results"].items():
+                x = rr["annual_results"].groupby("year")["payout_support_gap"].mean().reset_index()
+                x["Scenario"] = name
+                gap_mean.append(x)
+            gap = pd.concat(gap_mean, ignore_index=True)
+            fig = px.bar(gap, x="year", y="payout_support_gap", color="Scenario", barmode="group",
+                         labels={"payout_support_gap": "Mean support gap ($mm)", "year": ""},
+                         title="Institutional funding gap (payout below required support)")
+            fig.update_layout(margin=dict(l=10, r=10, t=40, b=10), legend=dict(orientation="h", y=-0.2), legend_title_text="")
+            st.plotly_chart(fig, use_container_width=True)
+        with right:
+            cov = _year_median(res["results"], "liquidity_coverage")
+            if not cov.empty:
+                fig = px.line(cov, x="year", y="liquidity_coverage", color="Scenario", markers=True,
+                              labels={"liquidity_coverage": "Median liquidity coverage (x payout)", "year": ""},
+                              title="Liquidity coverage (below 1x = forced sales / payout cuts)")
+                fig.add_hline(y=1.0, line_dash="dot", line_color="red", annotation_text="1x")
+                fig.update_layout(margin=dict(l=10, r=10, t=40, b=10), legend=dict(orientation="h", y=-0.2),
+                                  legend_title_text="")
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Liquidity coverage is shown when a scenario has liquidity constraints on (Scenario 2).")
+
+        st.markdown("#### Variable impacts: returns, inflation, expenses, payout, liquidity")
+        st.caption("Deterministic path (P4 long-run return and average historical CPI as the baseline) so each shock's "
+                   "effect can be read year by year.")
+        names = [n for n in res["det_paths"] if n != "Baseline"]
+        pick = st.selectbox("Scenario", names, key="r3_impact_pick")
+        impact = variable_impact_table(res["det_paths"]["Baseline"], res["det_paths"][pick], years=min(6, horizon))
+        st.dataframe(_fmt_impact(impact), use_container_width=True, hide_index=True)
+
+        st.markdown("#### Calibration and empirical grounding")
+        cal = res["calibration"]
+        cal = cal[cal["Scenario"].isin(res["include"])]
+        st.dataframe(cal, use_container_width=True, hide_index=True)
+        st.caption("Rows marked 'Assumption (to be confirmed)' are placeholders until R2/D2 deliver institution-level "
+                   "liquidity and commitment benchmarks. Sources: "
+                   + "; ".join(f"[{t}]({u})" for t, u in R3_EVIDENCE_SOURCES))
+
+        d1, d2, d3 = st.columns(3)
+        d1.download_button("Download focus results", focus.to_csv(index=False).encode("utf-8"),
+                           "r3_stress_focus_results.csv", "text/csv")
+        d2.download_button("Download variable impacts", impact.to_csv(index=False).encode("utf-8"),
+                           "r3_variable_impacts.csv", "text/csv")
+        d3.download_button("Download calibration table", res["calibration"].to_csv(index=False).encode("utf-8"),
+                           "r3_calibration.csv", "text/csv")
+
+    st.divider()
+    if st.toggle("Show additional exploratory scenarios and tools (scenario library, custom builder, reverse stress, "
+                 "sensitivity grid)", value=False, key="show_exploratory"):
+        _render_exploratory(data, cfg, inst, liq, custom_history)

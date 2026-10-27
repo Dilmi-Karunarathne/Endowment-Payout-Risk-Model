@@ -375,6 +375,16 @@ def scenario_liquidity(liq: LiquidityParams, scenario: StressScenario) -> Liquid
 # Monte Carlo stress
 # ---------------------------------------------------------------------------
 
+def add_derived_columns(path: pd.DataFrame) -> pd.DataFrame:
+    """Real payout and liquidity coverage (cash available for the payout / planned payout; <1 means forced sales
+    or payout cuts are needed). Coverage is NaN when liquidity constraints are off."""
+    out = path.copy()
+    out["real_payout"] = out["actual_payout"] / out["cumulative_inflation_index"]
+    cash = (out["liquid_assets"] - out["required_liquidity"]).clip(lower=0.0)
+    out["liquidity_coverage"] = cash / out["planned_payout"].where(out["planned_payout"] > 0)
+    return out
+
+
 def run_stress_scenario(
     data: ModelData,
     cfg: SimulationConfig,
@@ -400,6 +410,20 @@ def run_stress_scenario(
     per_path_loss = ar.groupby("path_id")["forced_sale_loss"].sum() if not ar.empty else pd.Series(dtype=float)
     m["mean_forced_sale_loss"] = float(per_path_loss.mean()) if len(per_path_loss) else 0.0
     m["probability_forced_sale"] = float((ar.groupby("path_id")["forced_sale"].sum() > 0).mean()) if not ar.empty else 0.0
+    if not ar.empty:
+        ar = add_derived_columns(ar)
+        res["annual_results"] = ar
+        g = ar.groupby("path_id")
+        m["median_total_real_payout"] = float(g["real_payout"].sum().median())
+        m["p05_total_real_payout"] = float(g["real_payout"].sum().quantile(0.05))
+        first_years = ar[ar["year"] < cfg.start_year + 3]
+        m["median_real_payout_first3"] = float(first_years.groupby("path_id")["real_payout"].sum().median())
+        m["median_total_support_gap"] = float(g["payout_support_gap"].sum().median())
+        m["mean_total_support_gap"] = float(g["payout_support_gap"].sum().mean())
+        m["median_avg_payout_adequacy"] = float(g["payout_adequacy_ratio"].mean().median())
+        cov = g["liquidity_coverage"].min()
+        m["median_min_liquidity_coverage"] = float(cov.median()) if cov.notna().any() else np.nan
+        m["p05_min_liquidity_coverage"] = float(cov.quantile(0.05)) if cov.notna().any() else np.nan
     res["metrics"] = m
     res["scenario"] = scenario
     return res
@@ -498,8 +522,9 @@ def run_deterministic_stress(
 ) -> pd.DataFrame:
     q = expected_quarterly_path(data, cfg.horizon_years, annual_return, inflation)
     m = scenario.market
-    if m.regime_state and not m.replay_quarters:
-        # Deterministic regime stress: use the historical mean P4 return / CPI of that regime for the forced quarters.
+    if m.regime_state:
+        # Deterministic regime stress: use the historical mean P4 return / CPI of that regime for the forced quarters
+        # (any replayed quarters are overwritten with the actual history by the transform below).
         hist = data.p4_quarterly if p4_history is None else p4_history
         k = min(int(m.regime_quarters), len(q))
         q.loc[: k - 1, "p4_return"] = float(hist.loc[hist["condition"] == m.regime_state, "p4_return"].mean())
@@ -510,7 +535,8 @@ def run_deterministic_stress(
         q = transform(np.random.default_rng(0), q)
     annual = quarterly_to_annual(q, cfg.start_year)
     overrides = build_year_overrides(scenario.endowment, cfg.horizon_years)
-    return run_path(annual, cfg, inst, scenario_liquidity(liq, scenario), year_overrides=overrides)
+    path = run_path(annual, cfg, inst, scenario_liquidity(liq, scenario), year_overrides=overrides)
+    return add_derived_columns(path)
 
 
 def deterministic_summary(path: pd.DataFrame, initial: float) -> Dict[str, float]:
@@ -637,6 +663,321 @@ def sensitivity_grid(
     out.index.name = "Instantaneous shock"
     out.columns.name = "Spending rate"
     return out
+
+
+# ---------------------------------------------------------------------------
+# R3 stress-scenario framework (Sprint Project | R3, "Proposed Stress-Scenario Framework")
+#
+# Goal: evaluate payout sustainability under two adverse economic regimes.
+#   Scenario 1 - High inflation & elevated rates: high inflation, rising cost of capital, elevated operating
+#                expenses. Focus: maintaining real payout value and meeting institutional funding needs.
+#   Scenario 2 - Prolonged downturn & liquidity squeeze: market losses, delayed private distributions,
+#                illiquid asset sales. Focus: meeting required payouts while minimising forced-sale losses.
+# Each parameter below carries its severity / duration / recovery role and its evidence basis.
+# ---------------------------------------------------------------------------
+
+SCENARIO_1 = "Scenario 1: High inflation & elevated rates"
+SCENARIO_2 = "Scenario 2: Prolonged downturn & liquidity squeeze"
+
+INFLATION_REPLAY = ("2022Q1", "2022Q2", "2022Q3", "2022Q4")
+GFC_REPLAY = ("2008Q1", "2008Q2", "2008Q3", "2008Q4", "2009Q1", "2009Q2")
+
+# External evidence used for defaults (see calibration_table for the full list with sources).
+HEPI_FY2022 = 0.052          # Commonfund HEPI, FY2022 (CPI 7.2% in the same year)
+HEPI_FY2023 = 0.041          # Commonfund HEPI, FY2023
+VSE_GIVING_FY2009 = -0.119   # CAE Voluntary Support of Education: giving to colleges, FY2009
+NACUBO_RETURN_FY2009 = -0.187
+SECONDARY_BID_H1_2010 = 0.80  # Cogent Partners: average high bid ~80% of NAV in H1 2010 (after the trough)
+
+
+@dataclass
+class InflationRatesParams:
+    """Scenario 1 shock parameters."""
+    replay_quarters: Tuple[str, ...] = INFLATION_REPLAY  # severity: actual 2022 stock-and-bond selloff and CPI
+    elevated_quarters: int = 16          # duration: forced Elevated-inflation quarters incl. replay (2021Q2-2025Q1 spell)
+    cpi_add: Optional[float] = None      # None = calibrate to the latest spell's average CPI
+    expense_growth: float = round((HEPI_FY2022 + HEPI_FY2023) / 2, 4)  # elevated operating-expense growth
+    expense_years: int = 2
+    return_drag: float = 0.0             # optional extra cost-of-capital drag on returns after the replay
+    drag_years: int = 0
+
+
+@dataclass
+class DownturnLiquidityParams:
+    """Scenario 2 shock parameters."""
+    replay_quarters: Tuple[str, ...] = GFC_REPLAY  # severity: actual GFC P4 path
+    recovery_drag: float = -0.03          # recovery path: slower-than-2009 recovery (assumption)
+    recovery_years: int = 2
+    gift_multiplier: float = round(1.0 + VSE_GIVING_FY2009, 3)
+    gift_years: int = 2
+    private_cash_drain: float = 0.02      # delayed distributions while capital calls continue, % of corpus / yr
+    drain_years: int = 3
+    liquid_haircut: float = 0.50          # share of liquid assets not available for the payout (rebalancing, collateral)
+    haircut_years: int = 2
+    buffer_years: float = 1.0             # liquidity reserve, years of planned payout (policy assumption)
+    forced_sale_discount: float = 0.30    # discount when illiquid assets are sold
+    allow_forced_sales: bool = True
+
+
+def latest_spell(data: ModelData, condition: str) -> Dict[str, object]:
+    c = data.condition_history.copy()
+    c["spell"] = (c["condition"] != c["condition"].shift()).cumsum()
+    spells = c[c["condition"] == condition].groupby("spell").agg(
+        start=("quarter", "first"), end=("quarter", "last"), quarters=("quarter", "size"), cpi=("cpi_yoy", "mean"))
+    last = spells.iloc[-1]
+    longest = spells.sort_values("quarters").iloc[-1]
+    return {
+        "start": last["start"], "end": last["end"], "quarters": int(last["quarters"]), "cpi": float(last["cpi"]),
+        "longest_start": longest["start"], "longest_end": longest["end"], "longest_quarters": int(longest["quarters"]),
+        "longest_cpi": float(longest["cpi"]),
+        "regime_cpi": float(c.loc[c["condition"] == condition, "cpi_yoy"].mean()),
+    }
+
+
+def default_cpi_add(data: ModelData) -> float:
+    """CPI add-on so the stress window matches the 2021-25 elevated-inflation spell instead of the all-history average."""
+    sp = latest_spell(data, "Elevated inflation")
+    return max(0.0, sp["longest_cpi"] - sp["regime_cpi"])
+
+
+def build_inflation_rates_scenario(data: ModelData, inst: InstitutionalParams,
+                                   p: Optional[InflationRatesParams] = None) -> StressScenario:
+    p = p or InflationRatesParams()
+    n_replay = len(p.replay_quarters)
+    post_years = max(0, int(np.ceil((p.elevated_quarters - n_replay) / 4)))
+    cpi_add = default_cpi_add(data) if p.cpi_add is None else float(p.cpi_add)
+    return StressScenario(
+        SCENARIO_1, "R3 framework",
+        "High inflation, rising cost of capital and elevated operating expenses. Replays 2022 (stocks and bonds fell "
+        "together while CPI ran at 7-9%), keeps the Elevated-inflation regime for the stress window, lifts operating-"
+        "expense growth to the HEPI level, then recovers through the R1 transition matrix.",
+        MarketShock(replay_quarters=tuple(p.replay_quarters), regime_state="Elevated inflation",
+                    regime_quarters=int(max(p.elevated_quarters, n_replay)),
+                    inflation_add=cpi_add, inflation_years=post_years,
+                    return_drag_annual=float(p.return_drag), drag_years=int(p.drag_years)),
+        EndowmentShock(expense_growth_add=max(0.0, float(p.expense_growth) - inst.annual_expense_growth),
+                       expense_growth_years=int(p.expense_years)),
+    )
+
+
+def build_downturn_liquidity_scenario(data: ModelData, inst: InstitutionalParams,
+                                      p: Optional[DownturnLiquidityParams] = None) -> StressScenario:
+    p = p or DownturnLiquidityParams()
+    return StressScenario(
+        SCENARIO_2, "R3 framework",
+        "Market losses, delayed private distributions and illiquid asset sales. Replays the GFC (2008Q1-2009Q2), "
+        "slows the recovery, cuts gifts by the FY2009 amount, and turns liquidity constraints on: private capital "
+        "keeps being called while distributions stall, part of the liquid book is unavailable, and any funding gap "
+        "is met by selling illiquid assets at a discount.",
+        MarketShock(replay_quarters=tuple(p.replay_quarters), return_drag_annual=float(p.recovery_drag),
+                    drag_years=int(p.recovery_years)),
+        EndowmentShock(gift_multiplier=float(p.gift_multiplier), gift_years=int(p.gift_years),
+                       capital_call_rate=float(p.private_cash_drain), capital_call_years=int(p.drain_years),
+                       liquid_haircut_add=float(p.liquid_haircut), liquid_haircut_years=int(p.haircut_years),
+                       liquidity_overrides=dict(enabled=True, liquidity_buffer_years=float(p.buffer_years),
+                                                forced_sale_discount=float(p.forced_sale_discount),
+                                                allow_forced_sales=bool(p.allow_forced_sales))),
+    )
+
+
+def calibration_table(data: ModelData, inst: InstitutionalParams,
+                      p1: Optional[InflationRatesParams] = None,
+                      p2: Optional[DownturnLiquidityParams] = None) -> pd.DataFrame:
+    """Shock parameters, their quantitative impact, and the evidence behind each (for the R3 calibration requirements)."""
+    p1 = p1 or InflationRatesParams()
+    p2 = p2 or DownturnLiquidityParams()
+    sp = latest_spell(data, "Elevated inflation")
+    cpi_add = default_cpi_add(data) if p1.cpi_add is None else p1.cpi_add
+    q = data.p4_quarterly.set_index("quarter")
+    infl_ret = replay_cumulative_return(data, p1.replay_quarters)
+    infl_cpi = float(q.loc[list(p1.replay_quarters), "cpi_yoy"].mean())
+    gfc_ret = replay_cumulative_return(data, p2.replay_quarters)
+    trans = data.transition_matrix
+    stay_e = float(trans.loc["Elevated inflation", "Elevated inflation"])
+    stay_r = float(trans.loc["Recession", "Recession"])
+    hist = "Historical data (R1 / D1)"
+    ext = "External evidence"
+    assum = "Assumption (to be confirmed)"
+    rows = [
+        (SCENARIO_1, "Severity", "Asset returns", f"Replay {p1.replay_quarters[0]}-{p1.replay_quarters[-1]}",
+         f"P4 {infl_ret:.1%} cumulative; CPI {infl_cpi:.1%} avg", hist,
+         "Actual P4 quarterly returns and CPI YoY in 2022, when equities and bonds fell together as policy rates rose."),
+        (SCENARIO_1, "Duration", "Inflation", f"{p1.elevated_quarters} quarters in Elevated-inflation regime",
+         f"CPI +{cpi_add:.1%} pts after the replay", hist,
+         f"Longest elevated spell in the CPI history: {sp['longest_start']}-{sp['longest_end']} "
+         f"({sp['longest_quarters']} quarters, CPI {sp['longest_cpi']:.1%} avg vs {sp['regime_cpi']:.1%} for all "
+         "elevated quarters); the add-on closes that gap."),
+        (SCENARIO_1, "Variable impact", "Operating expenses",
+         f"Expense growth {p1.expense_growth:.1%} for {p1.expense_years} yrs",
+         f"+{max(0.0, p1.expense_growth - inst.annual_expense_growth):.1%} pts vs R2 base {inst.annual_expense_growth:.1%}",
+         ext, f"Commonfund HEPI: {HEPI_FY2022:.1%} in FY2022 and {HEPI_FY2023:.1%} in FY2023 (highest since 2001)."),
+        (SCENARIO_1, "Variable impact", "Cost of capital",
+         f"Return drag {p1.return_drag:.1%}/yr for {p1.drag_years} yrs" if p1.drag_years else "Within the 2022 replay",
+         "Bond and equity repricing", hist if not p1.drag_years else assum,
+         "The 2022 replay already contains the rate-driven repricing of bonds and equities; an extra drag is optional."),
+        (SCENARIO_1, "Recovery path", "Regime", "R1 transition matrix after the stress window",
+         f"P(stay Elevated) {stay_e:.0%}/qtr", hist,
+         "Exit from the forced window follows the full-history Normal / Recession / Elevated transition probabilities."),
+        (SCENARIO_2, "Severity", "Asset returns", f"Replay {p2.replay_quarters[0]}-{p2.replay_quarters[-1]}",
+         f"P4 {gfc_ret:.1%} cumulative", hist,
+         f"Actual P4 GFC path. Cross-check: NACUBO average endowment return FY2009 {NACUBO_RETURN_FY2009:.1%}."),
+        (SCENARIO_2, "Duration / recovery path", "Asset returns",
+         f"Return drag {p2.recovery_drag:.1%}/yr for {p2.recovery_years} yrs after the replay",
+         "Slower recovery than 2009Q3 onward", assum,
+         f"P4 rebounded quickly after 2009Q2; the drag tests a prolonged downturn. Then R1 matrix (P(stay Recession) "
+         f"{stay_r:.0%}/qtr)."),
+        (SCENARIO_2, "Variable impact", "Gifts", f"Gifts x {p2.gift_multiplier:.2f} for {p2.gift_years} yrs",
+         f"{p2.gift_multiplier - 1:.1%} vs normal", ext,
+         f"CAE Voluntary Support of Education: giving to colleges fell {abs(VSE_GIVING_FY2009):.1%} in FY2009."),
+        (SCENARIO_2, "Variable impact", "Liquidity: delayed distributions",
+         f"Net private cash drain {p2.private_cash_drain:.1%} of corpus/yr for {p2.drain_years} yrs",
+         "Competes with the payout for liquid assets", assum,
+         "In the GFC, private-fund capital calls fell ~50% while distributions fell 60-82% (AltamarCAM), so LP net "
+         "cash flow turned negative. Size depends on unfunded commitments (awaiting R2/D2 benchmark)."),
+        (SCENARIO_2, "Variable impact", "Liquidity: accessible liquid assets",
+         f"{p2.liquid_haircut:.0%} haircut for {p2.haircut_years} yrs; buffer {p2.buffer_years:.1f} yrs of payout",
+         f"P4 liquid share {float(data.calibration['liquid_share']):.1%}", assum,
+         "Policy reserve and rebalancing/collateral needs; R2/D2 have not finalised institution-level liquidity "
+         "benchmarks."),
+        (SCENARIO_2, "Variable impact", "Liquidity: forced-sale discount", f"{p2.forced_sale_discount:.0%} of NAV",
+         "Loss on illiquid sales", ext,
+         f"Secondary bids were still ~{SECONDARY_BID_H1_2010:.0%} of NAV in H1 2010 after recovering (Cogent Partners), "
+         "so crisis-trough discounts were deeper than 20%."),
+    ]
+    return pd.DataFrame(rows, columns=["Scenario", "Role", "Variable", "Setting", "Quantitative impact",
+                                       "Evidence type", "Basis"])
+
+
+def liquidity_breaking_point(data, cfg, inst, liq, p2: Optional[DownturnLiquidityParams] = None,
+                             p4_history=None, tol: float = 1e-3) -> Dict[str, float]:
+    """Scenario 2 reverse test on the deterministic path: the smallest liquid-asset haircut, and separately the
+    smallest net private cash drain, at which cash no longer covers the payout (coverage < 1x), i.e. forced sales
+    or payout cuts begin. NaN = not reached within the search range."""
+    p2 = p2 or DownturnLiquidityParams()
+
+    def min_cov(params: DownturnLiquidityParams) -> float:
+        sc = build_downturn_liquidity_scenario(data, inst, params)
+        path = run_deterministic_stress(data, cfg, inst, liq, sc, p4_history)
+        return float(path["liquidity_coverage"].min())
+
+    def search(field: str, hi: float) -> float:
+        if min_cov(replace(p2, **{field: hi})) >= 1.0:
+            return np.nan
+        lo_v, hi_v = 0.0, hi
+        if min_cov(replace(p2, **{field: 0.0})) < 1.0:
+            return 0.0
+        while hi_v - lo_v > tol:
+            mid = 0.5 * (lo_v + hi_v)
+            if min_cov(replace(p2, **{field: mid})) < 1.0:
+                hi_v = mid
+            else:
+                lo_v = mid
+        return hi_v
+
+    return {
+        "current_min_coverage": min_cov(p2),
+        "breaking_haircut": search("liquid_haircut", 1.0),
+        "breaking_cash_drain": search("private_cash_drain", 0.5),
+    }
+
+
+R3_EVIDENCE_SOURCES = [
+    ("Commonfund HEPI FY2022 (Higher Ed Dive)", "https://www.highereddive.com/news/hepi-2022-higher-ed-inflation/638923/"),
+    ("Commonfund HEPI FY2023 (Higher Ed Dive)", "https://www.highereddive.com/news/colleges-inflation-costs-increased-4-percent-in-fy23/702457/"),
+    ("Giving to colleges fell 11.9% in 2009 (Chronicle of Philanthropy)", "https://www.philanthropy.com/news/giving-to-private-colleges-dropped-last-year-survey-finds/"),
+    ("NACUBO FY2009 average endowment return (Chronicle)", "https://www.chronicle.com/article/average-return-on-endowment-investments-is-worst-in-almost-40-years/"),
+    ("Private equity cash flows in times of upheaval (AltamarCAM)", "https://www.altamarcam.com/?p=98739"),
+    ("Secondaries bids soar in H1 2010 (Private Funds CFO)", "https://www.privatefundscfo.com/print-editions/2010-07/secondaries-bids-soar-in-h1-2010/"),
+    ("Harvard endowment 2009 liquidity and commitments (Harvard Magazine)", "https://harvardmagazine.com/2009/11/harvard-endowment-update?page=all"),
+]
+
+
+def r3_scenarios(data: ModelData, inst: InstitutionalParams,
+                 p1: Optional[InflationRatesParams] = None, p2: Optional[DownturnLiquidityParams] = None,
+                 include: Sequence[str] = (SCENARIO_1, SCENARIO_2)) -> List[StressScenario]:
+    out = []
+    if SCENARIO_1 in include:
+        out.append(build_inflation_rates_scenario(data, inst, p1))
+    if SCENARIO_2 in include:
+        out.append(build_downturn_liquidity_scenario(data, inst, p2))
+    return out
+
+
+def r3_focus_table(results: Dict[str, Dict[str, object]], cfg: SimulationConfig) -> pd.DataFrame:
+    """One row per scenario with the R3 focus measures for both scenarios plus common corpus-risk measures."""
+    base = results["Baseline"]["metrics"]
+    rows = []
+    for name, res in results.items():
+        m = res["metrics"]
+        rows.append({
+            "Scenario": name,
+            # Scenario 1 focus: real payout value and funding needs
+            "Cumulative real payout ($mm)": m["median_total_real_payout"],
+            "Δ real payout vs baseline": m["median_total_real_payout"] / base["median_total_real_payout"] - 1.0,
+            "Real payout, first 3 yrs ($mm)": m["median_real_payout_first3"],
+            "Pr(any support gap)": m["probability_any_support_gap"],
+            "Total support gap ($mm)": m["median_total_support_gap"],
+            "Avg payout adequacy": m["median_avg_payout_adequacy"],
+            # Scenario 2 focus: required payouts and forced-sale losses
+            "Pr(≥1 payout shortfall)": m["probability_at_least_one_shortfall"],
+            "Avg shortfall depth": m["average_relative_shortfall_depth"],
+            "Pr(forced sale)": m["probability_forced_sale"],
+            "Mean forced-sale loss ($mm)": m["mean_forced_sale_loss"],
+            "Lowest liquidity coverage (median)": m["median_min_liquidity_coverage"],
+            # Common corpus risk
+            "Median terminal real ($mm)": m["median_terminal_real_assets"],
+            "Δ median real vs baseline": m["median_terminal_real_assets"] / base["median_terminal_real_assets"] - 1.0,
+            "5th pct terminal real ($mm)": m["p05_terminal_real_assets"],
+            "Pr(real corpus < initial)": m["probability_real_corpus_below_initial"],
+            f"ES {int(cfg.alpha*100)}% real-corpus loss": m["expected_shortfall_terminal_real_corpus_loss"],
+            "Liquidity constraints": "On" if m["liquidity_constraints"] else "Off",
+        })
+    return pd.DataFrame(rows)
+
+
+def variable_impact_table(base_path: pd.DataFrame, stress_path: pd.DataFrame, years: int = 5) -> pd.DataFrame:
+    """Year-by-year quantitative effect of a scenario on returns, inflation, expenses, payout and liquidity
+    (deterministic path), next to the baseline."""
+    b = base_path.head(years).reset_index(drop=True)
+    s = stress_path.head(years).reset_index(drop=True)
+    rows = []
+    spec = [
+        ("Portfolio return", "portfolio_return", "pct"),
+        ("Inflation (CPI)", "inflation", "pct"),
+        ("Operating expenses ($mm)", "operating_expenses", "mm"),
+        ("Gifts ($mm)", "endowment_gifts", "mm"),
+        ("Real payout ($mm)", "real_payout", "mm"),
+        ("Payout support gap ($mm)", "payout_support_gap", "mm"),
+        ("Liquidity coverage (x payout)", "liquidity_coverage", "x"),
+        ("Private cash drain ($mm)", "capital_call", "mm"),
+        ("Forced-sale loss ($mm)", "forced_sale_loss", "mm"),
+        ("Real ending assets ($mm)", "real_ending_assets", "mm"),
+    ]
+    for label, col, kind in spec:
+        for which, df in (("Baseline", b), ("Stress", s)):
+            row = {"Variable": label, "Path": which, "Unit": kind}
+            for i in range(len(df)):
+                row[str(int(df.loc[i, "year"]))] = float(df.loc[i, col]) if pd.notna(df.loc[i, col]) else np.nan
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def run_r3_framework(data, cfg, inst, liq, p1=None, p2=None, include=(SCENARIO_1, SCENARIO_2),
+                     p4_history=None, progress=None):
+    scenarios = r3_scenarios(data, inst, p1, p2, include)
+    table, results = run_stress_suite(data, cfg, inst, liq, scenarios, p4_history=p4_history, progress=progress)
+    det_table, det_paths = run_deterministic_suite(data, cfg, inst, liq, scenarios, p4_history=p4_history)
+    return {
+        "focus": r3_focus_table(results, cfg),
+        "table": table,
+        "results": results,
+        "det_table": det_table,
+        "det_paths": det_paths,
+        "paths": median_real_paths(results),
+        "real_payout_paths": median_real_paths(results, "real_payout"),
+        "calibration": calibration_table(data, inst, p1, p2),
+    }
+
 
 
 if __name__ == "__main__":

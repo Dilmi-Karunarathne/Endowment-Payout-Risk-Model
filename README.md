@@ -34,7 +34,29 @@ streamlit run app.py
 
 ## Stress testing
 
-The Stress testing tab overlays shocks on the same model and the same random seed, so differences between scenarios come from the stress rather than sampling noise. The validated core is unchanged when no stress is applied (historical validation and baseline Monte Carlo results are identical).
+R3 stress-scenario framework (default view of the Stress testing tab)
+
+Goal: evaluate payout sustainability under two major adverse economic regimes. Tick one or both scenarios and click "Run R3 stress scenarios"; the baseline is always included.
+
+Scenario 1: High inflation & elevated rates. Conditions: high inflation, rising cost of capital, elevated operating expenses. Focus: maintaining real payout value and meeting institutional funding needs.
+- Severity: replay of actual 2022 P4 returns and CPI (P4 -14.2%, CPI 8.0% average; stocks and bonds fell together as rates rose).
+- Duration: 16 quarters in the Elevated-inflation regime (the 2021Q2-2025Q1 spell in the CPI history), with a CPI add-on so post-replay inflation matches that spell (5.0%) rather than the all-history elevated average (3.6%).
+- Operating expenses: growth of 4.7% for 2 years (Commonfund HEPI FY2022 5.2%, FY2023 4.1%) vs the R2 base growth.
+- Recovery path: R1 transition matrix after the stress window.
+- Focus outputs: cumulative and annual real payout, change vs baseline, Pr(any support gap), total support gap, payout adequacy.
+
+Scenario 2: Prolonged downturn & liquidity squeeze. Conditions: market losses, delayed private distributions, illiquid asset sales. Focus: meeting required payouts while minimising forced-sale asset losses.
+- Severity: replay of the actual GFC P4 path, 2008Q1-2009Q2 (-22.0%; NACUBO FY2009 average endowment return -18.7%).
+- Recovery path: -3% per year return drag for 2 years after the replay (assumption: slower than the actual 2009 rebound), then the R1 transition matrix.
+- Gifts: -11.9% for 2 years (CAE Voluntary Support of Education, FY2009).
+- Liquidity (constraints switched on): net private cash drain 2% of corpus per year for 3 years (calls continue while distributions are delayed), 50% of liquid assets unavailable for 2 years, 1-year payout reserve, 30% forced-sale discount on illiquid assets.
+- Focus outputs: payout shortfall probability and depth, forced-sale probability and loss, liquidity coverage (cash available for the payout / planned payout), and a liquidity breaking point (the haircut or cash drain at which forced sales begin).
+
+All shock parameters can be changed in the tab. The tab also shows a year-by-year variable-impact table (returns, inflation, expenses, gifts, real payout, support gap, liquidity, forced sales) and a calibration table that labels each parameter as historical data, external evidence or an assumption to be confirmed by R2/D2.
+
+Additional exploratory scenarios
+
+The earlier scenario library, custom builder, reverse stress test and sensitivity grid remain available behind the "Show additional exploratory scenarios and tools" toggle. They overlay shocks on the same model and the same random seed, so differences between scenarios come from the stress rather than sampling noise. The validated core is unchanged when no stress is applied (historical validation and baseline Monte Carlo results are identical).
 
 Market scenarios
 - Regime: forced Recession start (6q) and Elevated-inflation start (8q), as before.
