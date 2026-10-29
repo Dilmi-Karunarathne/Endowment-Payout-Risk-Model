@@ -1,0 +1,4 @@
+Scenario,Annual return-coverage shortfall,Pr(any payout funding shortfall),Annual payout funding shortfall,Conditional funding depth,Median longest coverage spell (years),Median longest funding spell (years),Pr(real corpus erosion),Median terminal real corpus ($M),Median cumulative real payouts ($M),Terminal real-corpus ES,Pr(unpaid other obligation),Change in ending real endowment ($M),Pr(forced sale),Mean forced-sale loss ($M),Pr(unfunded capital call),Pr(institutional support gap)
+Baseline,0.407,0.0,0.0,0.0,2.0,0.0,0.696,183.55397058022655,76.41773622730665,0.45426661775202404,0.0,0.0,0.0,0.0,0.0,0.736
+High inflation & elevated rates,0.4798,0.0,0.0,0.0,2.0,0.0,1.0,125.12329336994668,55.39422076450626,0.6319414855973754,0.0,-58.43067721027987,0.0,0.0,0.0,1.0
+Prolonged downturn & liquidity squeeze,0.4742,0.0,0.0,0.0,2.0,0.0,1.0,118.02923496781952,53.837421660527596,0.6328410578147899,0.0,-65.52473561240703,0.0,0.0,0.0,1.0

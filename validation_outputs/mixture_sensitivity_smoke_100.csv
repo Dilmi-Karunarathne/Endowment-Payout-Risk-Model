@@ -1,0 +1,7 @@
+Scenario,Annual return-coverage shortfall,Pr(any payout funding shortfall),Annual payout funding shortfall,Conditional funding depth,Median longest coverage spell (years),Median longest funding spell (years),Pr(real corpus erosion),Median terminal real corpus ($M),Median cumulative real payouts ($M),Terminal real-corpus ES,Pr(unpaid other obligation)
+Adverse probability 11.0%,0.289,0.0,0.0,0.0,1.0,0.0,0.47,237.95445345067614,83.44593510223136,0.26916878629082286,0.0
+Adverse probability 16.0%,0.384,0.0,0.0,0.0,2.0,0.0,0.66,182.30825288349206,78.04878309351525,0.47892177400794883,0.0
+Adverse probability 21.0%,0.475,0.0,0.0,0.0,3.0,0.0,0.82,138.10051181050446,69.26287858741891,0.6070845455594072,0.0
+Adverse mean shift -2.0% quarterly,0.426,0.0,0.0,0.0,2.0,0.0,0.72,161.92493405715533,74.37061053669359,0.6002495146193133,0.0
+Adverse mean shift +0.0% quarterly,0.384,0.0,0.0,0.0,2.0,0.0,0.66,182.30825288349206,78.04878309351525,0.47892177400794883,0.0
+Adverse mean shift +2.0% quarterly,0.345,0.0,0.0,0.0,2.0,0.0,0.52,215.7870622510595,82.08155562642332,0.3287493622224922,0.0

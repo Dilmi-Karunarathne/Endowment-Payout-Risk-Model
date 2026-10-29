@@ -1,0 +1,137 @@
+{
+  "config": {
+    "initial_endowment": 150.0,
+    "prior_endowment_2y": 150.0,
+    "prior_endowment_1y": 150.0,
+    "horizon_years": 10,
+    "start_year": 2027,
+    "n_sims": 500,
+    "seed": 42,
+    "alpha": 0.95,
+    "return_method": "Single Normal",
+    "block_size_quarters": 4,
+    "starting_regime": "Normal",
+    "stress_state": null,
+    "stress_quarters": 0,
+    "annual_return_shift": 0.0,
+    "volatility_multiplier": 1.0,
+    "annual_inflation": 0.025,
+    "adverse_probability": null,
+    "adverse_mean": null,
+    "adverse_std": null,
+    "real_corpus_threshold": 1.0
+  },
+  "institution": {
+    "institution_type": "Private",
+    "scenario": "Base",
+    "effective_spending_rate": 0.0489071417374225,
+    "support_ratio": 0.0976196613323893,
+    "expenses_to_endowment_ratio": 0.4997373752519529,
+    "annual_expense_growth": 0.0278497494901358,
+    "gift_rate": 0.0166316046694104,
+    "other_changes_rate": 0.0019967836792656,
+    "spending_rule": "Trailing average",
+    "smoothing_years": 3,
+    "annual_payout_growth_cap": null,
+    "annual_payout_growth_floor": null
+  },
+  "liquidity": {
+    "enabled": false,
+    "liquid_share": 0.5567641523873877,
+    "illiquid_share": 0.2416515013895071,
+    "liquidity_buffer_years": 0.0,
+    "other_annual_cash_need": 0.0,
+    "forced_sale_discount": 0.0,
+    "allow_forced_sales": true,
+    "liquid_share_haircut": 0.0,
+    "minimum_cash_reserve": 0.0,
+    "moderately_liquid_access": 0.0
+  },
+  "scenarios": [
+    {
+      "name": "High inflation & elevated rates",
+      "category": "Main",
+      "narrative": "2022 replay, elevated inflation and higher operating expenses.",
+      "market": {
+        "replay_quarters": [
+          "2022Q1",
+          "2022Q2",
+          "2022Q3",
+          "2022Q4"
+        ],
+        "asset_shocks": {},
+        "portfolio_shock": null,
+        "return_drag_annual": 0.0,
+        "drag_years": 0,
+        "inflation_add": 0.014,
+        "inflation_years": 3.0,
+        "regime_state": "Elevated inflation",
+        "regime_quarters": 16
+      },
+      "endowment": {
+        "gift_multiplier": 1.0,
+        "gift_years": 0,
+        "spending_rate_add": 0.0,
+        "spending_years": 0,
+        "expense_level_shock": 0.0,
+        "expense_growth_add": 0.0181502505098642,
+        "expense_growth_years": 2,
+        "other_changes_add": 0.0,
+        "other_changes_years": 0,
+        "special_draw_rate": 0.0,
+        "special_draw_years": 0,
+        "capital_call_rate": 0.0,
+        "capital_call_years": 0,
+        "liquid_haircut_add": 0.0,
+        "liquid_haircut_years": 0,
+        "liquidity_overrides": {}
+      }
+    },
+    {
+      "name": "Prolonged downturn & liquidity squeeze",
+      "category": "Main",
+      "narrative": "GFC replay, slower recovery, lower gifts and reduced access to cash.",
+      "market": {
+        "replay_quarters": [
+          "2008Q1",
+          "2008Q2",
+          "2008Q3",
+          "2008Q4",
+          "2009Q1",
+          "2009Q2"
+        ],
+        "asset_shocks": {},
+        "portfolio_shock": null,
+        "return_drag_annual": -0.03,
+        "drag_years": 2,
+        "inflation_add": 0.0,
+        "inflation_years": 0,
+        "regime_state": null,
+        "regime_quarters": 0
+      },
+      "endowment": {
+        "gift_multiplier": 0.88,
+        "gift_years": 2,
+        "spending_rate_add": 0.0,
+        "spending_years": 0,
+        "expense_level_shock": 0.0,
+        "expense_growth_add": 0.0,
+        "expense_growth_years": 0,
+        "other_changes_add": 0.0,
+        "other_changes_years": 0,
+        "special_draw_rate": 0.0,
+        "special_draw_years": 0,
+        "capital_call_rate": 0.02,
+        "capital_call_years": 3,
+        "liquid_haircut_add": 0.5,
+        "liquid_haircut_years": 2,
+        "liquidity_overrides": {
+          "enabled": true,
+          "liquidity_buffer_years": 1.0,
+          "forced_sale_discount": 0.3,
+          "allow_forced_sales": true
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+Scenario,Annual return-coverage shortfall,Pr(any payout funding shortfall),Annual payout funding shortfall,Conditional funding depth,Median longest coverage spell (years),Median longest funding spell (years),Pr(real corpus erosion),Median terminal real corpus ($M),Median cumulative real payouts ($M),Terminal real-corpus ES,Pr(unpaid other obligation)
+Baseline,0.408,0.0,0.0,0.0,2.0,0.0,0.64,179.92836576024115,73.54996802842632,0.4655508579529447,0.0
+Lower returns,0.55,0.0,0.0,0.0,3.0,0.0,0.89,117.68715627362064,63.31316606171975,0.6556853340141815,0.0
+Higher inflation,0.408,0.0,0.0,0.0,2.0,0.0,0.87,128.61145060901723,61.28354116521601,0.6179797490796463,0.0
+Higher spending,0.437,0.0,0.0,0.0,2.0,0.0,0.69,163.20093710196397,85.44086474609227,0.5240860200040343,0.0
+Liquidity restriction,0.408,0.0,0.0,0.0,2.0,0.0,0.64,179.92836576024112,73.54996802842632,0.46555085795294476,0.0
+Combined stress,0.576,0.0,0.0,0.0,3.0,0.0,0.98,75.63468618036586,62.144683363172845,0.7832959923421445,0.0
