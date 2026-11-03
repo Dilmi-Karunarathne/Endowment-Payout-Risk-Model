@@ -1,412 +1,348 @@
-from __future__ import annotations
-
-from dataclasses import replace
+from dashboard_home import detail_key
+"""Endowment planning dashboard."""
+from dataclasses import asdict, replace
 from io import BytesIO
-
+from pathlib import Path
+import json
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
+from endowment_simulation_model import (SimulationConfig, load_default_data,
+    institutional_params_from_data, liquidity_params_from_data, run_monte_carlo, historical_validation)
+from portfolio_return_simulation import compare_return_methods, fit_mixture, checked_history
+from strategy_analysis import portfolio_from_assets, policy_cases, compare_cases, comparison_row, load_six_portfolio_weights
+from validation import calibration_diagnostics, holdout_diagnostics, stability_check
+from dashboard_home import render_home, keep_detail_inputs
+from stress_tab import primary_stress_inputs, primary_stress_signature
+from scenario_stress import run_stress_suite
+from dashboard_ui import apply_style, band_chart, style_figure, risk_table, comparison_display
 
-from portfolio_return_simulation import compare_return_methods
+st.set_page_config(page_title='Endowment Payout Risk',page_icon="icon/GSU-logo.jpg",layout='wide')
+apply_style()
+st.title('Endowment Payout Risk Lab')
+st.markdown('<p class="intro">Explore how investment and spending choices shape university funding.</p>',unsafe_allow_html=True)
 
-from endowment_simulation_model import (
-    SimulationConfig,
-    historical_validation,
-    institutional_params_from_data,
-    liquidity_params_from_data,
-    load_default_data,
-    load_excel_overrides,
-    percentile_path,
-    run_monte_carlo,
-    stress_configs,
-    summarize_path,
-)
-
-
-st.set_page_config(page_title="Endowment Payout-Risk Simulation", page_icon="📊", layout="wide")
-
+keep_detail_inputs()
+view=st.session_state.setdefault('dashboard_view','home')
+if view!='home':
+    if st.button('← Back to dashboard',key='back_to_dashboard'):
+        st.session_state['dashboard_view']='home'
+        st.rerun()
+    st.caption('Dashboard / '+{'overview':'Payout & purchasing power','strategies':'Strategies','stress':'Stress tests','returns':'Return models','data':'Data & assumptions','checks':'Model checks'}.get(view,view))
 
 @st.cache_data
-def load_data_cached():
-    return load_default_data()
+def get_data(institution="Private", allocation="Normal"):
+    return load_default_data(institution_type=institution, allocation=allocation)
 
+@st.cache_data
+def fit_history(values):
+    return fit_mixture(np.asarray(values))
 
-def pct(x):
-    return f"{x:.2%}" if pd.notna(x) else "—"
+@st.cache_data
+def diagnostics_for_history(history):
+    return calibration_diagnostics(history)
 
+data=get_data()
+base=SimulationConfig(return_method='Single Normal',n_sims=1000)
+inst=institutional_params_from_data(data)
+liq=liquidity_params_from_data(data)
+history=data.portfolio_quarterly
+source_key='default'
+allocation_matrix=load_six_portfolio_weights()
 
-def mm(x):
-    return f"${x:,.2f}M" if pd.notna(x) else "—"
+def number(label,value,**kwargs):
+    return st.number_input(label,value=float(value),key=detail_key(kwargs.pop('input_key',source_key+label)),**kwargs)
 
+with st.sidebar:
+    st.subheader('Your endowment')
+    basic=st.container()
+    advanced=st.expander('Advanced options')
+    with basic:
+        institution_type=st.selectbox('Institution',['Private','Public'],index=['Private','Public'].index(inst.institution_type),key=detail_key('institution_'+source_key))
+    with basic:
+        allocation=st.selectbox('Portfolio allocation',['Normal','Elevated Inflation','Recession'],key=detail_key('portfolio_allocation'),help='Fixed R1 allocation for the selected institution. This does not select or switch the future market scenario.')
+    data=get_data(institution_type,allocation)
+    history=data.portfolio_quarterly
+    liq=liquidity_params_from_data(data)
+    scenario='Base'
+    inst=institutional_params_from_data(data,institution_type,scenario)
+    source_key+=institution_type+scenario
+    with basic:
+        initial=number('Starting endowment ($M)',base.initial_endowment,min_value=1.,step=5.,format='%.1f')
+        rule=st.selectbox('Spending rule',['Trailing average','Current assets'],format_func=lambda x:'Three-year average' if x=='Trailing average' else 'Beginning-of-year value',key=detail_key('app.py:78:selectbox'))
+        spending=number('Annual spending rate (%)',inst.effective_spending_rate*100,min_value=0.,max_value=100.,step=.1,format='%.2f')/100
+        years=st.slider('Projection horizon (years)',1,30,5,key=detail_key('app.py:80:slider'))
+        run=st.button('Run analysis',type='primary',use_container_width=True)
+    with advanced:
+        st.markdown('**Simulation**')
+        n=st.select_slider('Simulation paths',options=[100,500,1000,2000,5000,10000],value=1000,key=detail_key('app.py:84:select_slider'))
+        seed=st.number_input('Random seed',min_value=0,value=42,step=1,key=detail_key('app.py:85:number_input'))
+        start=st.number_input('Start year',min_value=2000,max_value=2100,value=2027,step=1,key=detail_key('app.py:86:number_input'))
+        method=st.selectbox('Return model',['Single Normal','Two-component Normal mixture','Quarterly block bootstrap','Regime-switching bootstrap'],key=detail_key('app.py:87:selectbox'))
+        block=st.slider('Bootstrap block (quarters)',1,min(8,len(history)),4,disabled='block' not in method.lower(),key=detail_key('app.py:88:slider'))
+        alpha=st.slider('Risk confidence level',.90,.99,.95,.01,key=detail_key('app.py:89:slider'))
+        threshold=st.slider('Principal threshold (% of starting value)',50,100,100,key=detail_key('app.py:90:slider'))/100
+        st.markdown('**Inflation and returns**')
+        fixed=st.checkbox('Use fixed inflation',value=True,key=detail_key('app.py:92:checkbox'))
+        inflation=st.number_input('Annual inflation (%)',value=2.5,min_value=-5.,max_value=30.,step=.1,disabled=not fixed,key=detail_key('app.py:93:number_input'))/100
+        shift=st.number_input('Annual mean-return adjustment (pp)',value=0.,min_value=-20.,max_value=20.,step=.5,key=detail_key('app.py:94:number_input'))/100
+        vol=st.number_input('Volatility multiplier',value=1.,min_value=.1,max_value=3.,step=.1,key=detail_key('app.py:95:number_input'))
+        p=adverse_mean=adverse_std=None
+        if 'mixture' in method.lower():
+            fitted=fit_history(tuple(history.portfolio_return.astype(float)))
+            override=st.checkbox('Customize adverse-return assumptions',key=detail_key('app.py:99:checkbox'))
+            if override:
+                p=st.number_input('Adverse-quarter probability (%)',value=float(fitted['adverse_probability']*100),min_value=0.,max_value=100.,key=detail_key('app.py:101:number_input'))/100
+                adverse_mean=st.number_input('Adverse quarterly mean (%)',value=float(fitted['adverse_mean']*100),min_value=-50.,max_value=30.,key=detail_key('app.py:102:number_input'))/100
+                adverse_std=st.number_input('Adverse quarterly volatility (%)',value=float(fitted['adverse_std']*100),min_value=.01,max_value=50.,key=detail_key('app.py:103:number_input'))/100
+        st.markdown('**Spending details**')
+        use_prior=st.checkbox('Use past endowment values',value=False,key=detail_key('past_'+source_key))
+        prior2=prior1=initial
+        if use_prior:
+            prior2=number('Endowment two years earlier ($M)',base.prior_endowment_2y,min_value=1.)
+            prior1=number('Endowment one year earlier ($M)',base.prior_endowment_1y,min_value=1.)
+        smoothing=3
+        collar=st.checkbox('Limit annual payout changes',key=detail_key('app.py:111:checkbox'))
+        floor=cap=None
+        if collar:
+            floor=st.number_input('Minimum annual payout change (%)',value=-5.,min_value=-100.,key=detail_key('app.py:114:number_input'))/100
+            cap=st.number_input('Maximum annual payout change (%)',value=5.,min_value=-100.,key=detail_key('app.py:115:number_input'))/100
+        gifts=number('Annual gifts (% of beginning assets)',inst.gift_rate*100,min_value=0.)/100
+        changes=number('Other endowment changes (%)',inst.other_changes_rate*100)/100
+        expenses=number('Expenses / initial endowment',inst.expenses_to_endowment_ratio,min_value=0.)
+        expense_growth=number('Annual expense growth (%)',inst.annual_expense_growth*100,min_value=-100.)/100
+        support=number('Required endowment support (% of expenses)',inst.support_ratio*100,min_value=0.)/100
+        st.markdown('**Liquidity**')
+        st.caption('Liquidity constraints apply to every analysis.')
+        other=number('Other annual cash needs ($M)',liq.other_annual_cash_need,min_value=0.)
+        liq=replace(liq,other_annual_cash_need=other)
+        liquid=number('Highly liquid assets (%)',liq.liquid_share*100,min_value=0.,max_value=100.,input_key=data.portfolio_label+'_liquid')/100
+        illiquid=number('Illiquid assets (%)',liq.illiquid_share*100,min_value=0.,max_value=100.,input_key=data.portfolio_label+'_illiquid')/100
+        buffer=number('Reserve (years of planned payout)',liq.liquidity_buffer_years,min_value=0.)
+        reserve=number('Minimum cash reserve ($M)',liq.minimum_cash_reserve,min_value=0.)
+        discount=number('Forced-sale discount (%)',liq.forced_sale_discount*100,min_value=0.,max_value=95.)/100
+        haircut=number('Restricted liquid assets (%)',liq.liquid_share_haircut*100,min_value=0.,max_value=100.)/100
+        moderate=number('Annual access to moderately liquid assets (%)',liq.moderately_liquid_access*100,min_value=0.,max_value=100.)/100
+        allow=st.checkbox('Allow forced sales',value=liq.allow_forced_sales,key=detail_key('app.py:133:checkbox'))
+        liq=replace(liq,liquid_share=liquid,illiquid_share=illiquid,liquidity_buffer_years=buffer,
+            minimum_cash_reserve=reserve,forced_sale_discount=discount,liquid_share_haircut=haircut,
+            moderately_liquid_access=moderate,allow_forced_sales=allow)
 
-def risk_metric_card(label, value, help_text=None):
-    st.metric(label, value, help=help_text)
+cfg=replace(base,initial_endowment=initial,prior_endowment_2y=prior2,prior_endowment_1y=prior1,
+    horizon_years=years,start_year=int(start),n_sims=int(n),seed=int(seed),alpha=alpha,return_method=method,
+    block_size_quarters=block,annual_return_shift=shift,volatility_multiplier=vol,
+    annual_inflation=inflation if fixed else None,adverse_probability=p,adverse_mean=adverse_mean,
+    adverse_std=adverse_std,real_corpus_threshold=threshold)
+inst=replace(inst,effective_spending_rate=spending,gift_rate=gifts,other_changes_rate=changes,
+    expenses_to_endowment_ratio=expenses,annual_expense_growth=expense_growth,support_ratio=support,
+    spending_rule=rule,smoothing_years=smoothing,annual_payout_growth_floor=floor,annual_payout_growth_cap=cap)
+settings={'config':asdict(cfg),'institution':asdict(inst),'liquidity':asdict(liq),
+    'portfolio_source':data.portfolio_metadata}
+st.caption(f'Active portfolio: {data.portfolio_label} · {len(history)} complete quarters · R2 median institutional inputs')
+signature=repr((settings,history.to_json()))
+changed=st.session_state.get('signature') is not None and st.session_state.get('signature')!=signature
+if st.session_state.get('signature')!=signature:
+    st.session_state['results']={}
+    st.session_state['signature']=signature
+results=st.session_state.setdefault('results',{})
 
-
-def simulation_controls(data, cfg_default, inst_default, liq_default):
-    st.sidebar.header("Simulation settings")
-    institution_type = st.sidebar.selectbox("Institution type", ["Private", "Public"], index=0)
-    scenario = st.sidebar.selectbox("R2 institutional scenario", ["Low", "Base", "High"], index=1)
-
-    initial = st.sidebar.number_input("Initial endowment ($mm)", min_value=1.0, value=float(cfg_default.initial_endowment), step=5.0)
-    prior2 = st.sidebar.number_input("Endowment two years before start ($mm)", min_value=1.0, value=float(cfg_default.prior_endowment_2y), step=5.0)
-    prior1 = st.sidebar.number_input("Endowment one year before start ($mm)", min_value=1.0, value=float(cfg_default.prior_endowment_1y), step=5.0)
-    start_year = st.sidebar.number_input("Projection start year", min_value=2023, max_value=2100, value=2027, step=1)
-    horizon = st.sidebar.slider("Projection horizon (years)", 5, 20, 10)
-    n_sims = st.sidebar.slider("Monte Carlo paths", 500, 10000, 3000, step=500)
-    seed = st.sidebar.number_input("Random seed", min_value=0, value=42, step=1)
-    alpha = st.sidebar.slider("VaR / Expected Shortfall confidence", 0.90, 0.99, 0.95, 0.01)
-
-    return_method = st.sidebar.selectbox(
-        "Return-generation method",
-        ["Quarterly block bootstrap", "Regime-switching bootstrap", "Two-component Normal mixture"],
-        index=1,
-        help="Block bootstrap samples contiguous historical P4 quarters. Regime switching simulates Normal/Recession/Elevated Inflation using R1 transition probabilities, then samples historical P4 returns conditional on the simulated state. The Normal mixture fits two components to aggregate P4 returns and independently chooses a component each quarter.",
-    )
-    include_comparison = st.sidebar.checkbox("Include method comparison", value=False,
-        help="Also compare block bootstrap and Normal mixture using common assumptions. Adds simulation time.")
-    block_size = st.sidebar.slider("Block size (quarters)", 1, 8, 4, disabled="block" not in return_method.lower())
-    starting_regime = st.sidebar.selectbox("Starting economic regime", ["Normal", "Recession", "Elevated inflation"], index=0, disabled="regime" not in return_method.lower())
-
-    st.sidebar.subheader("Future scenario assumptions")
-    return_shift = st.sidebar.number_input("Annual mean-return shift (percentage points)", min_value=-20.0, max_value=20.0, value=0.0, step=0.5,
-        help="Adds this value / 4 to each quarterly return. Zero retains historical calibration; this is not an annual compound-return target.") / 100.0
-    vol_multiplier = st.sidebar.number_input("Volatility multiplier", min_value=0.1, max_value=3.0, value=1.0, step=0.1)
-    inflation_mode = st.sidebar.selectbox("Inflation assumption", ["Historical", "Fixed annual rate"])
-    fixed_inflation = st.sidebar.number_input("Fixed annual inflation (%)", min_value=-5.0, max_value=30.0, value=2.5, step=0.1, disabled=inflation_mode == "Historical") / 100.0
-    st.sidebar.caption("P4 allocation maintained throughout; no asset-level drift or rebalancing trades. Historical inflation with the mixture uses the historical mean CPI YoY.")
-
-    inst = institutional_params_from_data(data, institution_type, scenario)
-    st.sidebar.subheader("R2 / D2 assumptions")
-    other_changes_rate = st.sidebar.number_input(
-        "Other endowment changes (% of beginning assets)",
-        value=float(inst.other_changes_rate * 100.0),
-        step=0.05,
-        format="%.3f",
-        help="Private values use the provisional R3-derived D2 benchmark. Public has no finalized benchmark and defaults to 0% unless changed here.",
-    ) / 100.0
-    inst = replace(inst, other_changes_rate=other_changes_rate)
-
-    st.sidebar.subheader("Liquidity / payout execution")
-    liquidity_enabled = st.sidebar.checkbox(
-        "Activate liquidity constraints",
-        value=False,
-        help="Off = validated base mechanics, Actual Payout = Planned Payout. On = scenario assumptions determine payout funding capacity and forced sales.",
-    )
-    liq = liquidity_params_from_data(data, enabled=liquidity_enabled)
-    if liquidity_enabled:
-        buffer_years = st.sidebar.number_input("Liquidity buffer (years of planned payout)", min_value=0.0, value=0.0, step=0.1)
-        other_cash = st.sidebar.number_input("Other annual cash need ($mm)", min_value=0.0, value=0.0, step=0.5)
-        discount = st.sidebar.slider("Forced-sale discount", 0.0, 0.60, 0.20, 0.01)
-        liquid_haircut = st.sidebar.slider("Accessible-liquid-share haircut", 0.0, 0.90, 0.0, 0.05)
-        forced_sales = st.sidebar.checkbox("Allow forced sales", value=True)
-        liq = replace(
-            liq,
-            enabled=True,
-            liquidity_buffer_years=buffer_years,
-            other_annual_cash_need=other_cash,
-            forced_sale_discount=discount,
-            liquid_share_haircut=liquid_haircut,
-            allow_forced_sales=forced_sales,
-        )
-
-    cfg = SimulationConfig(
-        initial_endowment=float(initial),
-        prior_endowment_2y=float(prior2),
-        prior_endowment_1y=float(prior1),
-        horizon_years=int(horizon),
-        start_year=int(start_year),
-        n_sims=int(n_sims),
-        seed=int(seed),
-        alpha=float(alpha),
-        return_method=return_method,
-        block_size_quarters=int(block_size),
-        starting_regime=starting_regime,
-        annual_return_shift=float(return_shift),
-        volatility_multiplier=float(vol_multiplier),
-        annual_inflation=float(fixed_inflation) if inflation_mode == "Fixed annual rate" else None,
-        stress_state=None,
-        stress_quarters=0,
-    )
-    return cfg, inst, liq, include_comparison
-
-
-data = load_data_cached()
-
-st.title("Endowment Payout-Risk Simulation Model")
-st.caption("R1 P4 investment calibration + R2 institutional benchmarks + Monte Carlo / stress simulation")
-
-with st.expander("Model scope and current limitations", expanded=False):
-    st.markdown(
-        """
-        - **Validated core:** investment return roll-forward, gifts, other endowment changes, 3-year moving-average payout, expenses, required support, inflation/real corpus and drawdowns.
-        - **Simulation baseline:** quarterly block bootstrap, R1 regime-switching bootstrap, or a two-component Normal mixture at portfolio level.
-        - **Selected payout-risk measures:** payout shortfall frequency, payout shortfall depth, and Expected Shortfall of terminal real-corpus loss.
-        - **Liquidity mechanics are scenario assumptions**, not finalized R2/D2 policy benchmarks. They are off by default.
-        - P4 is the current interim R1 Medium | Normal portfolio until the seven-cohort portfolio rebuild is delivered.
-        """
-    )
-
-uploaded = st.sidebar.file_uploader("Optional: upload updated clean Excel model", type=["xlsx"])
-base_cfg = SimulationConfig()
-base_inst = institutional_params_from_data(data, "Private", "Base")
-base_liq = liquidity_params_from_data(data, enabled=False)
-custom_history = None
-if uploaded is not None:
+def execute(key,fn):
+    results.pop(key,None)
     try:
-        base_cfg, base_inst, base_liq, custom_history = load_excel_overrides(uploaded.getvalue(), data=data)
-        st.sidebar.success("Excel calibration loaded. Simulation settings below can still override it.")
+        with st.spinner('Calculating your results…'):
+            results[key]=fn()
     except Exception as exc:
-        st.sidebar.error(f"Could not read workbook overrides: {exc}")
+        st.error(f'Unable to complete this analysis: {exc}')
 
-cfg, inst, liq, include_comparison = simulation_controls(data, base_cfg, base_inst, base_liq)
+# Comparison assumptions are shared with the detail widgets, even when the
+# detail page has never been opened. All main cards belong to one analysis run.
+alt_rate=st.session_state.get('detail_input_app.py:200:number_input',4.)/100
+alt_buffer=st.session_state.get('detail_input_app.py:201:number_input',.5)
+policy_inputs=(alt_rate,alt_buffer)
+if results.get('policy_inputs')!=policy_inputs:
+    results.pop('policies',None)
+stress_signature=primary_stress_signature(inst,cfg.n_sims)
+if results.get('main_stress_inputs')!=stress_signature:
+    results.pop('main_stress',None)
+    results.pop('stress',None)
 
-st.sidebar.subheader("Stress testing settings")
-recession_q = st.sidebar.slider("Recession stress duration (quarters)", 1, 12, 6)
-inflation_q = st.sidebar.slider("Elevated-inflation stress duration (quarters)", 1, 16, 8)
-
-with st.container(border=True):
-    st.markdown("**Selected settings**")
-    portfolio_col, endowment_col, horizon_col = st.columns(3)
-    portfolio_col.markdown("**Portfolio / cohort**")
-    portfolio_col.write("P4 — interim Medium | Normal")
-    endowment_col.markdown("**Starting endowment**")
-    endowment_col.write(mm(cfg.initial_endowment))
-    horizon_col.markdown("**Projection horizon**")
-    horizon_col.write(f"{cfg.horizon_years} years ({cfg.horizon_years * 4} quarters)")
-
-    spending_col, method_col, institution_col = st.columns(3)
-    spending_col.markdown("**Spending rule**")
-    spending_col.write(f"{inst.effective_spending_rate:.2%} of 3-year average endowment")
-    method_col.markdown("**Return method**")
-    method_col.write(cfg.return_method)
-    institution_col.markdown("**Institutional assumptions**")
-    institution_col.write(f"{inst.institution_type} / {inst.scenario}")
-    st.caption(f"{cfg.n_sims:,} simulation paths per case · Method comparison: {'included' if include_comparison else 'not included'}")
-
-input_signature = repr((cfg, inst, liq, recession_q, inflation_q, include_comparison,
-    custom_history.to_json() if custom_history is not None else None))
-result_keys = ["mc_result", "stress_df", "return_comparison"]
-if st.session_state.get("completed_signature") != input_signature:
-    for key in result_keys:
-        st.session_state.pop(key, None)
-    if "completed_signature" in st.session_state:
-        st.warning("Settings changed—run analysis to update results.")
-    else:
-        st.info("Choose your settings, then click Run analysis.")
-
-if st.button("Run analysis", type="primary", key="run_analysis"):
-    # Publish the results together only after all requested runs succeed.
-    for key in result_keys:
-        st.session_state.pop(key, None)
-    try:
-        with st.spinner("Running baseline and stress scenarios..."):
-            baseline_cfg = replace(cfg, stress_state=None, stress_quarters=0)
-            result = run_monte_carlo(data, baseline_cfg, inst, liq, p4_history=custom_history)
-            table = []
-            base_for_stress = baseline_cfg
-            for label, scfg in stress_configs(base_for_stress, recession_q, inflation_q).items():
-                res = result if label == "Baseline" else run_monte_carlo(data, scfg, inst, liq, p4_history=custom_history, keep_paths=True)
-                m = res["metrics"]
-                table.append(
-                    {
-                        "Scenario": label,
-                        "Median terminal nominal ($mm)": m["median_terminal_nominal_assets"],
-                        "Median terminal real ($mm)": m["median_terminal_real_assets"],
-                        "Payout shortfall probability": m["annual_shortfall_probability"],
-                        "Pr(≥1 payout shortfall)": m["probability_at_least_one_shortfall"],
-                        "Average relative shortfall depth": m["average_relative_shortfall_depth"],
-                        f"VaR {int(cfg.alpha*100)}% real-corpus loss": m["var_terminal_real_corpus_loss"],
-                        f"ES {int(cfg.alpha*100)}% real-corpus loss": m["expected_shortfall_terminal_real_corpus_loss"],
-                        "Pr(any support gap)": m["probability_any_support_gap"],
-                    }
-                )
-            comparison = compare_return_methods(data, cfg, inst, liq, p4_history=custom_history) if include_comparison else None
-        st.session_state["mc_result"] = result
-        st.session_state["stress_df"] = pd.DataFrame(table)
-        if comparison is not None:
-            st.session_state["return_comparison"] = comparison
-        st.session_state["completed_signature"] = input_signature
-        st.success("Analysis complete. All results below use the selected settings.")
-    except Exception as exc:
-        st.error(f"Analysis could not complete: {exc}")
-
-mc_tab, stress_tab, comparison_tab, assumptions_tab, validation_tab = st.tabs([
-    "Payout-risk results",
-    "Stress testing",
-    "Method comparison",
-    "Assumptions & data",
-    "Historical validation",
-])
-
-with validation_tab:
-    st.subheader("2013–2022 historical mechanics backtest")
-    st.caption("Uses actual historical P4 annual returns and D1/R1 historical inflation. This is a mechanics backtest, not out-of-sample predictive validation.")
-
-    hist_cfg = replace(
-        cfg,
-        start_year=2013,
-        horizon_years=10,
-        n_sims=1,
-        stress_state=None,
-        stress_quarters=0,
-    )
-    hist_liq = replace(liq, enabled=False)
-    hist = historical_validation(data, hist_cfg, inst, hist_liq)
-    hs = summarize_path(hist, hist_cfg.initial_endowment)
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Ending endowment", mm(hs["ending_assets"]))
-    c2.metric("Terminal real corpus", mm(hs["terminal_real_assets"]))
-    c3.metric("Total payout", mm(hs["total_payout"]))
-    c4.metric("Max real drawdown", pct(hs["max_real_drawdown"]))
-
-    chart_df = hist.set_index("year")[["ending_assets", "real_ending_assets"]].rename(
-        columns={"ending_assets": "Nominal ending assets", "real_ending_assets": "Real ending assets"}
-    )
-    st.line_chart(chart_df)
-
-    display_cols = [
-        "year", "portfolio_return", "beginning_assets", "investment_gain", "planned_payout", "actual_payout",
-        "endowment_gifts", "other_endowment_changes", "ending_assets", "inflation", "real_ending_assets",
-        "payout_support_gap", "payout_adequacy_ratio", "nominal_drawdown", "real_drawdown"
+if run:
+    results.clear()
+    selected=primary_stress_inputs(inst)
+    jobs=[
+        ('baseline','Payout and purchasing power',lambda:run_monte_carlo(data,cfg,inst,liq,portfolio_history=history)),
+        ('policies','Spending-policy comparison',lambda:compare_cases(data,policy_cases(cfg,inst,liq,alt_rate,alt_buffer),history)),
+        ('main_stress','Stress scenarios',lambda:run_stress_suite(data,cfg,inst,liq,selected,history)),
+        ('methods','Return-model comparison',lambda:compare_return_methods(data,cfg,inst,liq,portfolio_history=history)),
+        ('historical','Historical reconstruction',lambda:historical_validation(data,replace(cfg,horizon_years=10,start_year=2013),inst,liq)),
+        ('holdout','Out-of-sample return check',lambda:holdout_diagnostics(history)),
+        ('stability','Simulation stability',lambda:stability_check(data,cfg,inst,liq,history)),
     ]
-    st.dataframe(hist[display_cols], use_container_width=True, hide_index=True)
+    progress=st.progress(0,text='Starting all dashboard analyses…')
+    for index,(key,label,fn) in enumerate(jobs):
+        progress.progress(index/len(jobs),text=label+'…')
+        execute(key,fn)
+    results['policy_inputs']=policy_inputs
+    results['main_stress_inputs']=stress_signature
+    if 'main_stress' in results:
+        results['stress']=results['main_stress'][0]
+    progress.empty()
+    failed=[label for key,label,_ in jobs if key not in results]
+    if failed:
+        st.warning('Some analyses could not be completed: '+', '.join(failed)+'. No previous results are reused.')
+    else:
+        st.success('Analysis complete. All dashboard sections are updated.')
 
-    csv = hist.to_csv(index=False).encode("utf-8")
-    st.download_button("Download historical validation CSV", csv, "historical_validation.csv", "text/csv")
+if view=='home':
+    render_home(results,cfg,inst,liq,history,data,changed)
 
-with mc_tab:
-    st.subheader("Payout-risk results")
-    if not liq.enabled:
-        st.info("Liquidity constraints are OFF, so Actual Payout = Planned Payout. Payout shortfall frequency/depth will therefore be zero; Expected Shortfall and payout-support risk still vary with market/inflation outcomes.")
+if view=='overview':
+    if 'baseline' not in results:
+        if changed:
+            st.info('Settings updated. Select Run analysis to refresh your results.')
+        st.markdown('''<div class="empty-state"><h2>See what your endowment can support.</h2><p>Choose your starting value and spending rule, then select <b>Run analysis</b>.<br>Explore future payouts, purchasing power and funding risk in one place.</p></div>''',unsafe_allow_html=True)
+    else:
+        result=results['baseline'];m=result['metrics'];annual=result['annual_results']
+        st.markdown(f'<div class="selection">Starting value: ${initial:,.1f}M &nbsp; · &nbsp; Spending rate: {spending:.2%} &nbsp; · &nbsp; Horizon: {years} years</div>',unsafe_allow_html=True)
+        a,b,c=st.columns(3)
+        a.metric('Return-coverage shortfall',f"{m['annual_coverage_shortfall_probability']:.1%}",help='Share of simulated years where investment earnings fall below the planned payout.')
+        b.metric('Payout funding risk',f"{m['probability_at_least_one_shortfall']:.1%}",help=f'Chance of at least one year where actual payout is below planned payout over {years} years.')
+        c.metric('Real principal erosion',f"{m['probability_real_corpus_erosion']:.1%}",help=f'Chance real endowment value falls below {threshold:.0%} of its starting value in any projected year.')
+        a.caption('Years with earnings below planned payout')
+        b.caption('Any year with payout below plan')
+        c.caption(f'Any year below {threshold:.0%} of starting purchasing power')
+        initial_payout=float(annual.loc[annual.path_id==0,'planned_payout'].iloc[0])
+        with st.container(border=True):
+            st.subheader('Can the university maintain its annual funding?')
+            st.plotly_chart(band_chart(annual,'real_actual_payout',initial_payout,cfg.start_year,'Median real payout','Initial planned payout'),use_container_width=True)
+        with st.container(border=True):
+            st.subheader('How much purchasing power remains?')
+            st.plotly_chart(band_chart(annual,'real_ending_assets',initial,cfg.start_year,'Median real endowment','Starting principal'),use_container_width=True)
+        a,b=st.columns(2)
+        a.metric('Median ending real endowment',f"${m['median_terminal_real_assets']:,.1f}M")
+        b.metric('Median total real payouts',f"${m['median_cumulative_real_payout']:,.1f}M")
+        with st.expander('Explore risk measures'):
+            st.dataframe(risk_table(m),hide_index=True,use_container_width=True)
+        with st.expander('View individual simulation outcomes'):
+            st.dataframe(result['path_summary'],hide_index=True,use_container_width=True)
 
-    result = st.session_state.get("mc_result")
-    if result is not None:
-        m = result["metrics"]
-        row1 = st.columns(4)
-        row1[0].metric("Median terminal nominal corpus", mm(m["median_terminal_nominal_assets"]))
-        row1[1].metric("Median terminal real corpus", mm(m["median_terminal_real_assets"]))
-        row1[2].metric("Annual payout shortfall probability", pct(m["annual_shortfall_probability"]))
-        row1[3].metric("Pr(at least one payout shortfall)", pct(m["probability_at_least_one_shortfall"]))
+if view=='strategies':
+    st.subheader('Find a spending policy that fits your goals')
+    left,right=st.columns(2)
+    alt_rate=left.number_input('Compare spending rate (%)',value=4.,min_value=0.,max_value=100.,key=detail_key('app.py:200:number_input'))/100
+    alt_buffer=right.number_input('Compare reserve (years of payout)',value=.5,min_value=0.,key=detail_key('app.py:201:number_input'))
+    if results.get('policy_inputs')!=(alt_rate,alt_buffer):
+        results.pop('policies',None)
+    if st.button('Compare policies',type='primary'):
+        execute('policies',lambda:compare_cases(data,policy_cases(cfg,inst,liq,alt_rate,alt_buffer),history))
+        results['policy_inputs']=(alt_rate,alt_buffer)
+    if 'policies' in results:
+        table=results['policies']
+        chart=table.copy();chart['Payout reliability (%)']=100*(1-chart['Pr(any payout funding shortfall)'])
+        fig=px.scatter(chart,x='Payout reliability (%)',y='Median terminal real corpus ($M)',color='Scenario',
+            hover_data=['Median cumulative real payouts ($M)'],size_max=16)
+        style_figure(fig,'Ending real endowment ($M)');fig.update_xaxes(title='Payout reliability (%)');fig.update_traces(marker_size=14)
+        st.plotly_chart(fig,use_container_width=True)
+        st.dataframe(comparison_display(table),hide_index=True,use_container_width=True)
+    with st.expander('R2 input sensitivity (P25 / median / P75)'):
+        fields={'Gift rate':'gift_rate','Spending rate':'effective_spending_rate',
+                'Required support / expenses':'support_ratio','Expenses / endowment':'expenses_to_endowment_ratio',
+                'Expense growth':'annual_expense_growth'}
+        field_label=st.selectbox('Vary one institutional input',list(fields),key=detail_key('r2_sensitivity_field'))
+        field=fields[field_label]
+        st.caption('Only the selected input changes; all other settings and the chosen portfolio are held fixed. Percentiles are sensitivity values, not university cohorts.')
+        if results.get('r2_sensitivity_field')!=field:
+            results.pop('r2_sensitivity',None)
+        if st.button('Run input sensitivity'):
+            def sensitivity_run():
+                rows=[]
+                for level,label in [('Low','P25'),('Base','Median'),('High','P75')]:
+                    value=getattr(institutional_params_from_data(data,institution_type,level),field)
+                    result=run_monte_carlo(data,cfg,replace(inst,**{field:value}),liq,portfolio_history=history,keep_paths=False)
+                    row=comparison_row(label,result)
+                    row['Input value']=value
+                    row['Pr(any support gap)']=result['metrics']['probability_any_support_gap']
+                    rows.append(row)
+                return pd.DataFrame(rows)
+            execute('r2_sensitivity',sensitivity_run)
+            results['r2_sensitivity_field']=field
+        if 'r2_sensitivity' in results:
+            st.dataframe(comparison_display(results['r2_sensitivity']),hide_index=True,use_container_width=True)
 
-        row2 = st.columns(4)
-        row2[0].metric("Avg. relative shortfall depth", pct(m["average_relative_shortfall_depth"]))
-        row2[1].metric(f"VaR {int(m['alpha']*100)}% – terminal real loss", pct(m["var_terminal_real_corpus_loss"]))
-        row2[2].metric(f"Expected Shortfall {int(m['alpha']*100)}%", pct(m["expected_shortfall_terminal_real_corpus_loss"]))
-        row2[3].metric("Pr(any support gap)", pct(m["probability_any_support_gap"]))
+if view=='stress':
+    from stress_tab import render_stress_panel
+    render_stress_panel(data,cfg,inst,liq,history,results,execute)
 
-        st.markdown("#### Simulated real-endowment path")
-        ppath = percentile_path(result["annual_results"], "real_ending_assets", (0.05, 0.50, 0.95)).set_index("year")
-        ppath = ppath.rename(columns={"p05": "5th percentile", "p50": "Median", "p95": "95th percentile"})
-        st.line_chart(ppath)
+if view=='returns':
+    st.subheader('Compare ways to model investment returns')
+    if st.button('Compare return models',type='primary'):
+        execute('methods',lambda:compare_return_methods(data,cfg,inst,liq,portfolio_history=history))
+    if 'methods' in results:
+        table,parameters,cpi,detail=results['methods']
+        distributions=pd.concat([r['annual_results'][['portfolio_return']].assign(Model=name) for name,r in detail.items()],ignore_index=True)
+        fig=px.histogram(distributions,x='portfolio_return',color='Model',histnorm='probability density',barmode='overlay',opacity=.45,nbins=60)
+        style_figure(fig,'Density');fig.update_xaxes(title='Annual portfolio return',tickformat='.0%')
+        st.plotly_chart(fig,use_container_width=True)
+        st.dataframe(comparison_display(pd.DataFrame([comparison_row(name,r) for name,r in detail.items()])),hide_index=True,use_container_width=True)
+        with st.expander('View detailed comparison'):
+            st.caption(f'Common annual inflation: {cpi:.2%}')
+            st.dataframe(table,use_container_width=True)
+    with st.expander('View distribution fit'):
+        diagnostics,parameters=diagnostics_for_history(history)
+        st.dataframe(diagnostics,hide_index=True,use_container_width=True)
+        st.dataframe(pd.DataFrame({'Parameter':[key.replace('_',' ').capitalize() for key in parameters],
+                                   'Value':[f'{value:.2%}' for value in parameters.values()]}),hide_index=True,use_container_width=True)
 
-        left, right = st.columns(2)
-        with left:
-            st.markdown("#### Annual payout shortfall probability")
-            asp = result["annual_shortfall_probability"].set_index("year")
-            st.bar_chart(asp)
-        with right:
-            st.markdown("#### Terminal real-corpus distribution")
-            ps = result["path_summary"]
-            fig = px.histogram(ps, x="terminal_real_assets", nbins=40, labels={"terminal_real_assets": "Terminal real corpus ($mm)"})
-            fig.update_layout(showlegend=False, margin=dict(l=10, r=10, t=25, b=10))
-            st.plotly_chart(fig, use_container_width=True)
+if view=='data':
+    st.subheader('Supplied six-portfolio allocations')
+    st.caption('R2 median institutional inputs are used. Portfolio allocation and market stress are separate choices.')
+    st.info(f'All analyses use {data.portfolio_label}. Monthly weighted returns are compounded into complete quarters; allocations stay fixed during each run.')
+    st.caption('Historical applications of current allocations are retrospective benchmarks. Liquidity classes are provisional; no automatic signal-based reallocation is implemented.')
+    allocation_condition=allocation
+    selection=allocation_matrix[(allocation_matrix.institution==institution_type)&(allocation_matrix.economic_condition==allocation_condition)]
+    st.caption(f'Allocation preview: {institution_type} / {allocation_condition} · {len(selection)} assets · total weight {selection.weight.sum():.2%}')
+    allocation_plot=px.bar(selection,x='asset_name',y='weight')
+    style_figure(allocation_plot,'Portfolio weight');allocation_plot.update_xaxes(title=None);allocation_plot.update_yaxes(tickformat='.0%')
+    st.plotly_chart(allocation_plot,use_container_width=True)
+    st.dataframe(selection[['asset_name','bucket','weight']].rename(columns={'asset_name':'Asset','bucket':'Bucket','weight':'Weight'}).style.format({'Weight':'{:.2%}'}),hide_index=True,use_container_width=True)
+    with st.expander('All six allocations'):
+        matrix=allocation_matrix.pivot(index=['asset_name','bucket'],columns=['institution','economic_condition'],values='weight')
+        st.dataframe(matrix.style.format('{:.2%}'),use_container_width=True)
+    st.download_button('Download six-portfolio weights',Path(__file__).with_name('data').joinpath('six_portfolio_weights.csv').read_bytes(),'six_portfolio_weights.csv','text/csv')
+    with st.expander('Selected portfolio used in simulations'):
+        weights=data.portfolio_weights[['asset_name','weight','liquidity_class']].rename(columns={'asset_name':'Asset','weight':'Allocation','liquidity_class':'Liquidity'}).copy()
+        weights['Allocation']=weights.Allocation.map(lambda x:f'{x:.2%}')
+        st.dataframe(weights,hide_index=True,use_container_width=True)
+        st.caption(f'Return history: {history.quarter.iloc[0]}–{history.quarter.iloc[-1]} · {len(history)} quarters')
+        st.json(settings,expanded=False)
+    st.subheader('Save your analysis')
+    a,b=st.columns(2)
+    a.download_button('Download settings',json.dumps(settings,indent=2),'run_settings.json','application/json')
+    b.download_button('Download return history',history.to_csv(index=False),'active_calibration.csv','text/csv')
+    if 'baseline' in results:
+        r=results['baseline']
+        for label,filename,table in [('Annual results','annual_results',r['annual_results']),('Simulation outcomes','path_summary',r['path_summary']),('Risk measures','metrics',pd.DataFrame([r['metrics']]))]:
+            st.download_button(f'Download {label.lower()}',table.to_csv(index=False),f'{filename}.csv','text/csv')
+    for key in ['policies','stress','sensitivity','r2_sensitivity','stability','holdout']:
+        if key in results:
+            st.download_button(f'Download {key}',results[key].to_csv(index=False),f'{key}.csv','text/csv')
 
-        st.markdown("#### Path-level simulation results")
-        st.dataframe(result["path_summary"].head(250), use_container_width=True, hide_index=True)
-        st.download_button(
-            "Download Monte Carlo path summary",
-            result["path_summary"].to_csv(index=False).encode("utf-8"),
-            "monte_carlo_path_summary.csv",
-            "text/csv",
-        )
-        st.download_button(
-            "Download annual simulated results",
-            result["annual_results"].to_csv(index=False).encode("utf-8"),
-            "monte_carlo_annual_results.csv",
-            "text/csv",
-        )
-
-with comparison_tab:
-    st.subheader("P4: block bootstrap versus two-component Normal mixture")
-    st.caption("Uses the sidebar horizon, simulation count, seed, endowment, R2 assumptions, liquidity settings and future-return adjustments for both methods. Stress overrides are excluded from this baseline comparison.")
-    st.info("Both methods use the SAME constant inflation rate: your fixed rate, or the historical mean CPI YoY when Historical is selected. This isolates differences in return generation.")
-    st.caption("Block bootstrap retains observed sequences within each block. The mixture independently selects a lower-mean adverse or higher-mean ordinary component each quarter; these are statistical components, not economic regimes.")
-    if not include_comparison:
-        st.info("Select Include method comparison, then Run analysis to populate this tab.")
-    comparison = st.session_state.get("return_comparison")
-    if comparison is not None:
-        table, parameters, inflation, method_results = comparison
-        st.caption(f"P4 | {cfg.horizon_years} years ({cfg.horizon_years*4} quarters) | {cfg.n_sims:,} paths per method | Shared inflation {inflation:.2%}")
-        st.dataframe(table.style.format("{:.3f}"), use_container_width=True)
-        component_table = pd.DataFrame({
-            "Component": ["Ordinary (higher mean)", "Adverse (lower mean)"],
-            "Probability": [1-parameters["adverse_probability"], parameters["adverse_probability"]],
-            "Quarterly mean": [parameters["ordinary_mean"], parameters["adverse_mean"]],
-            "Quarterly standard deviation": [parameters["ordinary_std"], parameters["adverse_std"]],
-        })
-        st.markdown("**Historical mixture calibration (before scenario adjustments)**")
-        st.dataframe(component_table.style.format({c: "{:.2%}" for c in component_table.columns if c != "Component"}), hide_index=True)
-        st.caption("Both components can produce gains and losses. Returns below -100% are redrawn from the same component, so component distributions are truncated. Historical fit is provisional, not a validated forecast.")
-        if not liq.enabled:
-            st.caption("Liquidity is OFF: payout execution shortfall measures are zero by construction. Support gaps and real-corpus risk still vary.")
-        st.download_button("Download return-method comparison", table.to_csv().encode("utf-8"), "portfolio_return_comparison.csv", "text/csv")
-
-with stress_tab:
-    st.subheader("Stress testing")
-    st.caption("Compares the same model under baseline, a forced Recession start, and a forced Elevated Inflation start. Stress duration is configurable and uses R1 historical condition-specific return/inflation observations rather than arbitrary return shocks.")
-
-    stress_df = st.session_state.get("stress_df")
-    if stress_df is not None:
-        formatted = stress_df.copy()
-        for col in formatted.columns:
-            if col == "Scenario":
-                continue
-            if "($mm)" in col:
-                formatted[col] = formatted[col].map(lambda x: f"{x:,.2f}")
-            else:
-                formatted[col] = formatted[col].map(lambda x: f"{x:.2%}")
-        st.dataframe(formatted, use_container_width=True, hide_index=True)
-        st.bar_chart(stress_df.set_index("Scenario")[["Median terminal real ($mm)"]])
-        st.download_button("Download stress comparison", stress_df.to_csv(index=False).encode("utf-8"), "stress_comparison.csv", "text/csv")
-
-with assumptions_tab:
-    st.subheader("Forward-looking framework")
-    st.markdown(f"""
-    - **Portfolio:** P4, interim Medium | Normal allocation, held constant throughout.
-    - **Rebalancing convention:** assume the P4 allocation is maintained each quarter; portfolio-level data cannot verify or simulate trades. No costs, allocation drift or tactical changes.
-    - **Horizon:** {cfg.horizon_years} years, {4*cfg.horizon_years} quarterly returns; compounded into annual returns for the existing annual payout engine.
-    - **Return baseline:** historical P4 behavior persists unless the user changes the annual mean shift or volatility multiplier. The shift is divided by four; volatility scales deviations around the historical quarterly mean.
-    - **Mixture:** two fitted Normal components, chosen independently each quarter. No copula or regime persistence in this method.
-    - **Inflation:** historical sampling remains available for the existing methods; the mixture uses historical mean CPI YoY unless a fixed rate is chosen. The controlled comparison always uses one shared constant rate.
-    - **Stress:** forced initial quarters use historical condition-specific returns, then resume the selected generator. For mixture this is a hybrid historical stress override, not a fitted regime mixture.
-    - **Limits:** historical calibration does not predict future events; outputs are conditional scenarios. Payout timing stays annual.
-    """)
-    st.subheader("R2 scenario parameters")
-    st.dataframe(data.r2_scenarios, use_container_width=True, hide_index=True)
-
-    st.subheader("R1 P4 asset weights and liquidity")
-    p4w = data.p4_weights.copy()
-    p4w["weight_pct"] = p4w["weight"] * 100.0
-    st.dataframe(p4w[["asset", "weight_pct", "liquidity_class"]], use_container_width=True, hide_index=True)
-
-    st.subheader("R1 full-history regime transition matrix")
-    st.dataframe(data.transition_matrix.style.format("{:.2%}"), use_container_width=True)
-
-    st.subheader("Calibration notes")
-    st.markdown(
-        f"""
-        - P4 liquid share (Very High + High): **{data.calibration['liquid_share']:.2%}**
-        - P4 illiquid share (Low + Very Low): **{data.calibration['illiquid_share']:.2%}**
-        - P4 historical geometric annual return: **{data.calibration['geometric_annual_return']:.2%}**
-        - P4 historical annualized volatility: **{data.calibration['annualized_volatility']:.2%}**
-        - P4 historical maximum drawdown: **{data.calibration['historical_max_drawdown']:.2%}**
-        - Private Base other-endowment-changes rate: **{data.calibration['other_changes_rate_base']:.3%}** (provisional R3-derived D2 benchmark)
-        """
-    )
-
-st.divider()
-st.caption("Research 3 model. Baseline liquidity constraints are intentionally inactive until institution-level liquidity benchmarks are finalized.")
+if view=='checks':
+    st.subheader('Review the analysis')
+    with st.expander('Historical reconstruction'):
+        if st.button('Run historical check'):
+            execute('historical',lambda:historical_validation(data,replace(cfg,horizon_years=10,start_year=2013),inst,liq))
+        if 'historical' in results:
+            h=results['historical'];st.dataframe(h,hide_index=True,use_container_width=True)
+            st.caption(f'Maximum accounting difference: {h.accounting_residual.abs().max():.3g}M')
+    with st.expander('Out-of-sample return check'):
+        if st.button('Run holdout check'):
+            execute('holdout',lambda:holdout_diagnostics(history))
+        if 'holdout' in results:
+            st.dataframe(results['holdout'],hide_index=True,use_container_width=True)
+    with st.expander('Simulation stability'):
+        if st.button('Check simulation stability'):
+            execute('stability',lambda:stability_check(data,cfg,inst,liq,history))
+        if 'stability' in results:
+            st.dataframe(results['stability'],hide_index=True,use_container_width=True)

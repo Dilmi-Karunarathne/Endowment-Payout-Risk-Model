@@ -10,6 +10,33 @@ import numpy as np
 import pandas as pd
 
 
+YEAR_OVERRIDE_DEFAULTS = {
+    "gift_multiplier": 1.0,          # x institutional.gift_rate
+    "spending_rate_add": 0.0,        # + effective_spending_rate (absolute, e.g. 0.01 = +1pp)
+    "other_changes_add": 0.0,        # + other_changes_rate (absolute)
+    "expense_level_shock": 0.0,      # one-off % jump in operating expenses applied at the start of that year
+    "expense_growth_add": 0.0,       # + annual_expense_growth after that year (absolute)
+    "special_draw_rate": 0.0,        # extra outflow from the corpus, % of beginning assets (e.g. emergency appropriation)
+    "capital_call_rate": 0.0,        # liquidity demand, % of beginning assets; moves liquid -> illiquid, no corpus loss
+    "liquid_share_haircut_add": 0.0, # additional haircut on accessible liquid share (only when liquidity is enabled)
+}
+
+
+def validate_year_overrides(overrides, horizon):
+    if overrides is None:
+        return pd.DataFrame({k:[v]*horizon for k,v in YEAR_OVERRIDE_DEFAULTS.items()})
+    if len(overrides)!=horizon or set(overrides.columns)-set(YEAR_OVERRIDE_DEFAULTS):
+        raise ValueError("Stress overrides must have one row per year and known columns.")
+    result=pd.DataFrame({k:[v]*horizon for k,v in YEAR_OVERRIDE_DEFAULTS.items()})
+    for k in overrides:
+        result[k]=overrides[k].to_numpy(dtype=float)
+    if not np.isfinite(result.to_numpy()).all():
+        raise ValueError("Stress overrides must be finite.")
+    if (result[["gift_multiplier","special_draw_rate","capital_call_rate"]]<0).any().any() or (result.expense_level_shock < -1).any():
+        raise ValueError("Invalid stress cash-flow or expense override.")
+    return result
+
+
 STATE_ORDER = ["Normal", "Recession", "Elevated inflation"]
 
 
@@ -23,11 +50,15 @@ class InstitutionalParams:
     annual_expense_growth: float = 0.02784974949013586
     gift_rate: float = 0.01663160466941044
     other_changes_rate: float = 0.001996783679265606
+    spending_rule: str = "Trailing average"
+    smoothing_years: int = 3
+    annual_payout_growth_cap: Optional[float] = None
+    annual_payout_growth_floor: Optional[float] = None
 
 
 @dataclass
 class LiquidityParams:
-    enabled: bool = False
+    enabled: bool = True
     liquid_share: float = 0.5567641523873877
     illiquid_share: float = 0.2416515013895071
     liquidity_buffer_years: float = 0.0
@@ -35,6 +66,13 @@ class LiquidityParams:
     forced_sale_discount: float = 0.0
     allow_forced_sales: bool = True
     liquid_share_haircut: float = 0.0
+    minimum_cash_reserve: float = 0.0
+    moderately_liquid_access: float = 0.0
+
+
+    def __post_init__(self):
+        # Retained for settings compatibility; liquidity is mandatory.
+        self.enabled = True
 
 
 @dataclass
@@ -42,7 +80,7 @@ class SimulationConfig:
     initial_endowment: float = 150.0
     prior_endowment_2y: float = 150.0
     prior_endowment_1y: float = 150.0
-    horizon_years: int = 10
+    horizon_years: int = 5
     start_year: int = 2027
     n_sims: int = 5000
     seed: int = 42
@@ -57,16 +95,21 @@ class SimulationConfig:
     volatility_multiplier: float = 1.0
     # None preserves historical inflation sampling; a number fixes annual CPI.
     annual_inflation: Optional[float] = None
+    adverse_probability: Optional[float] = None
+    adverse_mean: Optional[float] = None
+    adverse_std: Optional[float] = None
+    real_corpus_threshold: float = 1.0
 
 
 @dataclass
 class ModelData:
-    p4_quarterly: pd.DataFrame
+    portfolio_quarterly: pd.DataFrame
     condition_history: pd.DataFrame
     transition_matrix: pd.DataFrame
     r2_scenarios: pd.DataFrame
-    p4_weights: pd.DataFrame
-    validation_annual_returns: pd.DataFrame
+    portfolio_weights: pd.DataFrame
+    portfolio_label: str
+    portfolio_metadata: dict
     calibration: Dict[str, float]
 
 
@@ -74,25 +117,22 @@ def _default_data_dir() -> Path:
     return Path(__file__).resolve().parent / "data"
 
 
-def load_default_data(data_dir: Optional[Path] = None) -> ModelData:
+def load_default_data(data_dir: Optional[Path] = None, institution_type="Private", allocation="Normal") -> ModelData:
+    """Build the selected R1 fixed-weight portfolio; no legacy P4 inputs."""
+    from strategy_analysis import build_selected_portfolio, load_six_portfolio_weights
     data_dir = Path(data_dir) if data_dir is not None else _default_data_dir()
-    p4 = pd.read_csv(data_dir / "p4_quarterly_history.csv")
     cond = pd.read_csv(data_dir / "condition_history.csv")
+    cond["cpi_yoy"] = pd.to_numeric(cond["cpi_yoy"], errors="raise")
     trans = pd.read_csv(data_dir / "transition_matrix.csv", index_col=0)
     r2 = pd.read_csv(data_dir / "r2_scenarios.csv")
-    weights = pd.read_csv(data_dir / "p4_weights.csv")
-    validation = pd.read_csv(data_dir / "validation_annual_returns.csv")
     cal_df = pd.read_csv(data_dir / "calibration.csv")
     calibration = dict(zip(cal_df["key"], cal_df["value"].astype(float)))
-
-    p4["p4_return"] = pd.to_numeric(p4["p4_return"], errors="coerce")
-    cond["cpi_yoy"] = pd.to_numeric(cond["cpi_yoy"], errors="coerce")
-    validation["year"] = validation["year"].astype(int)
-    validation["p4_annual_return"] = pd.to_numeric(validation["p4_annual_return"], errors="coerce")
-
-    # Attach the historical CPI YoY observation for the exact return-sample quarter.
-    p4 = p4.merge(cond[["quarter", "cpi_yoy"]], on="quarter", how="left", validate="one_to_one")
-    return ModelData(p4, cond, trans, r2, weights, validation, calibration)
+    matrix = load_six_portfolio_weights(data_dir / "six_portfolio_weights.csv")
+    assets = pd.read_csv(data_dir / "asset_monthly_returns.csv")
+    history, weights, metadata = build_selected_portfolio(assets, matrix, cond, institution_type, allocation)
+    calibration.update(liquid_share=float(weights.loc[weights.liquidity_class.isin(["Very High", "High"]), "weight"].sum()),
+                       illiquid_share=float(weights.loc[weights.liquidity_class.isin(["Low", "Very Low"]), "weight"].sum()))
+    return ModelData(history, cond, trans, r2, weights, f"{institution_type} / {allocation}", metadata, calibration)
 
 
 def institutional_params_from_data(
@@ -172,7 +212,7 @@ def load_excel_overrides(file_or_bytes, data: Optional[ModelData] = None) -> Tup
         other_changes_rate=float(r2["B10"].value or 0.0),
     )
     liq = LiquidityParams(
-        enabled=False,
+        enabled=True,
         liquid_share=float(mi["B22"].value),
         illiquid_share=float(mi["B24"].value),
         liquidity_buffer_years=float(mi["B31"].value or 0.0),
@@ -189,7 +229,7 @@ def load_excel_overrides(file_or_bytes, data: Optional[ModelData] = None) -> Tup
             {
                 "quarter": str(q),
                 "condition": str(r1[f"C{row}"].value),
-                "p4_return": float(r1[f"D{row}"].value),
+                "portfolio_return": float(r1[f"D{row}"].value),
             }
         )
     hist_df = pd.DataFrame(hist) if hist else None
@@ -240,57 +280,77 @@ def sample_quarterly_path(
     rng: np.random.Generator,
     data: ModelData,
     config: SimulationConfig,
-    p4_history: Optional[pd.DataFrame] = None,
+    portfolio_history: Optional[pd.DataFrame] = None,
     mixture_parameters=None,
 ) -> pd.DataFrame:
-    p4 = data.p4_quarterly if p4_history is None else p4_history.copy()
+    history = data.portfolio_quarterly if portfolio_history is None else portfolio_history.copy()
     n_quarters = int(config.horizon_years * 4)
     method = config.return_method.lower()
 
     def finish(path):
         # Same scenario transformation for every return method.
-        center = float(p4["p4_return"].mean())
-        path["p4_return"] = (center + config.volatility_multiplier *
-            (path["p4_return"] - center) + config.annual_return_shift / 4.0)
-        if (path["p4_return"] <= -1).any():
+        center = float(history["portfolio_return"].mean())
+        path["portfolio_return"] = (center + config.volatility_multiplier *
+            (path["portfolio_return"] - center) + config.annual_return_shift / 4.0)
+        if (path["portfolio_return"] <= -1).any():
             raise ValueError("Scenario produced returns <= -100%; reduce scenario severity.")
         if config.annual_inflation is not None:
-            path["cpi_yoy"] = config.annual_inflation
+            start=min(config.stress_quarters,len(path)) if config.stress_state else 0
+            path.loc[path.index[start:], "cpi_yoy"] = config.annual_inflation
         return path.reset_index(drop=True)
+
+    if method == "single normal":
+        from portfolio_return_simulation import sample_mixture
+        mean = float(history["portfolio_return"].mean())
+        std = float(history["portfolio_return"].std(ddof=1))
+        parameters = dict(ordinary_mean=mean, ordinary_std=std,
+                          adverse_mean=mean, adverse_std=std, adverse_probability=0.0)
+        path = pd.DataFrame({"portfolio_return": sample_mixture(rng, n_quarters, parameters),
+                             "condition": "Single Normal", "cpi_yoy": float(history["cpi_yoy"].mean())})
+        if config.stress_state and config.stress_quarters > 0:
+            for q in range(min(config.stress_quarters, n_quarters)):
+                path.loc[q, "condition"] = config.stress_state
+                path.loc[q, "portfolio_return"] = _sample_from_condition(rng, history, config.stress_state, "portfolio_return")
+                path.loc[q, "cpi_yoy"] = _sample_from_condition(rng, data.condition_history, config.stress_state, "cpi_yoy")
+        return finish(path)
 
     if "mixture" in method:
         from portfolio_return_simulation import fit_mixture, sample_mixture
-        parameters = mixture_parameters if mixture_parameters is not None else fit_mixture(p4["p4_return"].to_numpy())
+        parameters = mixture_parameters if mixture_parameters is not None else fit_mixture(history["portfolio_return"].to_numpy())
+        parameters = dict(parameters)
+        for key in ["adverse_probability", "adverse_mean", "adverse_std"]:
+            if getattr(config, key) is not None:
+                parameters[key] = getattr(config, key)
         path = pd.DataFrame({
-            "p4_return": sample_mixture(rng, n_quarters, parameters),
+            "portfolio_return": sample_mixture(rng, n_quarters, parameters),
             "condition": "Portfolio mixture",
             # No estimated return/inflation dependence in this simple mixture.
-            "cpi_yoy": float(p4["cpi_yoy"].mean()),
+            "cpi_yoy": float(history["cpi_yoy"].mean()),
         })
         if config.stress_state and config.stress_quarters > 0:
             for q in range(min(config.stress_quarters, n_quarters)):
                 state = config.stress_state
                 path.loc[q, "condition"] = state
-                path.loc[q, "p4_return"] = _sample_from_condition(rng, p4, state, "p4_return")
+                path.loc[q, "portfolio_return"] = _sample_from_condition(rng, history, state, "portfolio_return")
                 path.loc[q, "cpi_yoy"] = _sample_from_condition(rng, data.condition_history, state, "cpi_yoy")
         return finish(path)
 
     if "block" in method:
         block = max(1, int(config.block_size_quarters))
         rows = []
-        max_start = max(0, len(p4) - block)
+        max_start = max(0, len(history) - block)
         while len(rows) < n_quarters:
             start = int(rng.integers(0, max_start + 1))
-            chunk = p4.iloc[start : start + block]
+            chunk = history.iloc[start : start + block]
             rows.extend(chunk.to_dict("records"))
-        path = pd.DataFrame(rows[:n_quarters])[["p4_return", "condition", "cpi_yoy"]].copy()
+        path = pd.DataFrame(rows[:n_quarters])[["portfolio_return", "condition", "cpi_yoy"]].copy()
 
         # Stress override: replace the first stress window with condition-specific historical observations.
         if config.stress_state and config.stress_quarters > 0:
             for q in range(min(config.stress_quarters, n_quarters)):
                 state = config.stress_state
                 path.loc[q, "condition"] = state
-                path.loc[q, "p4_return"] = _sample_from_condition(rng, p4, state, "p4_return")
+                path.loc[q, "portfolio_return"] = _sample_from_condition(rng, history, state, "portfolio_return")
                 path.loc[q, "cpi_yoy"] = _sample_from_condition(rng, data.condition_history, state, "cpi_yoy")
         return finish(path)
 
@@ -308,7 +368,7 @@ def sample_quarterly_path(
             rows.append(
                 {
                     "condition": state,
-                    "p4_return": _sample_from_condition(rng, p4, state, "p4_return"),
+                    "portfolio_return": _sample_from_condition(rng, history, state, "portfolio_return"),
                     "cpi_yoy": _sample_from_condition(rng, data.condition_history, state, "cpi_yoy"),
                 }
             )
@@ -323,7 +383,7 @@ def quarterly_to_annual(quarterly_path: pd.DataFrame, start_year: int) -> pd.Dat
     rows = []
     for y in range(len(quarterly_path) // 4):
         block = quarterly_path.iloc[y * 4 : (y + 1) * 4]
-        annual_return = float(np.prod(1.0 + block["p4_return"].to_numpy(dtype=float)) - 1.0)
+        annual_return = float(np.prod(1.0 + block["portfolio_return"].to_numpy(dtype=float)) - 1.0)
         # Consistent with the validation workbook: annual average of quarterly CPI YoY observations.
         annual_inflation = float(block["cpi_yoy"].mean())
         dominant_state = str(block["condition"].mode().iloc[0])
@@ -343,123 +403,190 @@ def run_path(
     config: SimulationConfig,
     institutional: InstitutionalParams,
     liquidity: LiquidityParams,
+    year_overrides: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
+    validate_parameters(config, institutional, liquidity)
     if len(annual_market) != config.horizon_years:
         raise ValueError("Annual market path length must match horizon_years")
-
-    history = [float(config.prior_endowment_2y), float(config.prior_endowment_1y), float(config.initial_endowment)]
-    current = float(config.initial_endowment)
-    expenses = float(config.initial_endowment * institutional.expenses_to_endowment_ratio)
+    overrides=validate_year_overrides(year_overrides,config.horizon_years)
+    history = [config.prior_endowment_2y, config.prior_endowment_1y, config.initial_endowment]
+    current = config.initial_endowment
+    expenses = current * institutional.expenses_to_endowment_ratio
     cumulative_inflation = 1.0
-    nominal_peak = current
-    real_peak = current
+    nominal_peak = real_peak = current
+    # Persistent holdings: uniform portfolio return is applied to each liquidity bucket.
+    # No annual reset to target weights; transfers only occur when accessible cash is needed.
+    buckets = current * np.array([liquidity.liquid_share,
+        1 - liquidity.liquid_share - liquidity.illiquid_share, liquidity.illiquid_share], dtype=float)
+    previous_planned = None
     out = []
-
-    for i, market in annual_market.reset_index(drop=True).iterrows():
-        year = int(market["year"])
-        portfolio_return = float(market["portfolio_return"])
-        inflation = float(market["inflation"])
-
+    for t, market in annual_market.reset_index(drop=True).iterrows():
+        r, inflation = float(market["portfolio_return"]), float(market["inflation"])
+        if not np.isfinite([r, inflation]).all() or r < -1 or inflation <= -1:
+            raise ValueError("Returns must be >= -100%; inflation must exceed -100%.")
+        ov=overrides.iloc[t]
+        expenses *= 1+ov.expense_level_shock
+        expense_growth=institutional.annual_expense_growth+ov.expense_growth_add
+        if expense_growth < -1:raise ValueError('Expense growth must be >= -100%.')
         beginning = current
-        investment_gain = beginning * portfolio_return
-        gifts = beginning * institutional.gift_rate
-        other_changes = beginning * institutional.other_changes_rate
-        pre_payout = beginning + investment_gain + gifts + other_changes
-
-        planned_payout = float(np.mean(history[-3:]) * institutional.effective_spending_rate)
-
-        liquid_assets = pre_payout * liquidity.liquid_share
-        illiquid_assets = pre_payout * liquidity.illiquid_share
-        required_liquidity = np.nan
-        liquidity_shortfall = np.nan
-        forced_sale = 0.0
-        forced_sale_loss = 0.0
-        other_cash_need = 0.0
-
-        if liquidity.enabled:
-            effective_liquid_share = float(np.clip(liquidity.liquid_share * (1.0 - liquidity.liquid_share_haircut), 0.0, 1.0))
-            liquid_assets = pre_payout * effective_liquid_share
-            illiquid_assets = pre_payout * liquidity.illiquid_share
-            other_cash_need = max(0.0, float(liquidity.other_annual_cash_need))
-            required_liquidity = planned_payout * max(0.0, liquidity.liquidity_buffer_years) + other_cash_need
-            # Reserve and other annual cash needs must be met before the payout is funded from highly liquid assets.
-            payout_cash_capacity = max(0.0, liquid_assets - required_liquidity)
-            liquidity_shortfall = max(0.0, planned_payout - payout_cash_capacity)
-
-            if liquidity.allow_forced_sales and liquidity_shortfall > 0:
-                discount = float(np.clip(liquidity.forced_sale_discount, 0.0, 0.95))
-                gross_needed = liquidity_shortfall / max(1e-12, 1.0 - discount)
-                forced_sale = min(illiquid_assets, gross_needed)
-                net_forced_sale_proceeds = forced_sale * (1.0 - discount)
-                forced_sale_loss = forced_sale * discount
-                actual_payout = min(planned_payout, payout_cash_capacity + net_forced_sale_proceeds)
-            else:
-                actual_payout = min(planned_payout, payout_cash_capacity)
+        capital_call=beginning*ov.capital_call_rate
+        special_draw=beginning*ov.special_draw_rate
+        gain = beginning * r
+        gifts = beginning * institutional.gift_rate * ov.gift_multiplier
+        changes = beginning * (institutional.other_changes_rate+ov.other_changes_add)
+        pre = beginning + gain + gifts + changes
+        if pre < -1e-10:
+            raise ValueError("Negative assets before distributions; revise other-changes assumption.")
+        pre = max(0., pre)
+        buckets *= 1 + r
+        flows = gifts + changes
+        if flows >= 0:
+            buckets[0] += flows  # gifts/other positive changes are assumed liquid and unrestricted
         else:
-            actual_payout = planned_payout
-
-        ending = pre_payout - actual_payout - forced_sale_loss - other_cash_need
-        ending = max(0.0, ending)
-
-        required_support = expenses * institutional.support_ratio
-        payout_support_gap = max(0.0, required_support - actual_payout)
-        payout_adequacy_ratio = actual_payout / required_support if required_support > 0 else np.nan
-
-        shortfall_amount = max(0.0, planned_payout - actual_payout)
-        shortfall_indicator = 1 if shortfall_amount > 1e-12 else 0
-        relative_shortfall_depth = shortfall_amount / planned_payout if planned_payout > 0 else 0.0
-
+            total = buckets.sum()
+            buckets *= max(0., (total + flows) / total) if total > 0 else 0.
+        base = beginning if institutional.spending_rule == "Current assets" else np.mean(history[-institutional.smoothing_years:])
+        planned = max(0., base * np.clip(institutional.effective_spending_rate+ov.spending_rate_add,0.,1.))
+        if previous_planned is not None:
+            if institutional.annual_payout_growth_floor is not None:
+                planned = max(planned, previous_planned * (1 + institutional.annual_payout_growth_floor))
+            if institutional.annual_payout_growth_cap is not None:
+                planned = min(planned, previous_planned * (1 + institutional.annual_payout_growth_cap))
+        previous_planned = planned
+        policy_planned=planned
+        planned += special_draw
+        requested_other = liquidity.other_annual_cash_need  # endowment-funded only
+        reserve = (planned * liquidity.liquidity_buffer_years + liquidity.minimum_cash_reserve) if liquidity.enabled else 0.
+        haircut = np.clip(liquidity.liquid_share_haircut+ov.liquid_share_haircut_add,0.,1.) if liquidity.enabled else 0.
+        liquid_assets, moderate_assets, illiquid_assets = buckets.copy()
+        accessible = buckets[0] * (1 - haircut)
+        forced_sale = forced_loss = moderate_sale = 0.
+        need = requested_other + capital_call + planned + reserve
+        if liquidity.enabled:
+            moderate_sale = min(buckets[1] * liquidity.moderately_liquid_access, max(0., need - accessible))
+            buckets[1] -= moderate_sale
+            buckets[0] += moderate_sale
+            accessible += moderate_sale
+            if liquidity.allow_forced_sales:
+                forced_sale = min(buckets[2], max(0., need - accessible) / (1 - liquidity.forced_sale_discount))
+                forced_loss = forced_sale * liquidity.forced_sale_discount
+                buckets[2] -= forced_sale
+                buckets[0] += forced_sale - forced_loss
+                accessible += forced_sale - forced_loss
+        else:
+            # All assets may be sold at carrying value, but no external funding is assumed.
+            accessible = pre
+        capacity = max(0., accessible - reserve)
+        other_paid = min(requested_other, capacity)
+        capital_paid=min(capital_call,max(0.,capacity-other_paid))
+        actual = min(planned, max(0., capacity - other_paid - capital_paid))
+        total_paid = other_paid + capital_paid + actual
+        if liquidity.enabled:
+            buckets[0] -= total_paid
+        else:
+            total = buckets.sum()
+            buckets *= max(0., (total - total_paid) / total) if total > 0 else 0.
+        buckets[2] += capital_paid
+        buckets = np.maximum(buckets, 0.)
+        buckets[buckets < 1e-12] = 0.
+        ending = float(buckets.sum())
+        residual = ending - (pre - actual - other_paid - forced_loss)
+        if abs(residual) > 1e-8 * max(1., pre):
+            raise ArithmeticError("Endowment roll-forward failed.")
+        support = expenses * institutional.support_ratio
+        shortfall = max(0., planned - actual)
+        coverage_gap = max(0., planned - gain)
         nominal_peak = max(nominal_peak, ending)
-        nominal_drawdown = ending / nominal_peak - 1.0 if nominal_peak > 0 else 0.0
-
-        cumulative_inflation *= max(1e-9, 1.0 + inflation)
-        real_ending = ending / cumulative_inflation
-        real_peak = max(real_peak, real_ending)
-        real_drawdown = real_ending / real_peak - 1.0 if real_peak > 0 else 0.0
-
-        out.append(
-            {
-                "year": year,
-                "dominant_condition": market.get("dominant_condition", ""),
-                "beginning_assets": beginning,
-                "portfolio_return": portfolio_return,
-                "investment_gain": investment_gain,
-                "pre_payout_assets": pre_payout,
-                "planned_payout": planned_payout,
-                "actual_payout": actual_payout,
-                "endowment_gifts": gifts,
-                "other_endowment_changes": other_changes,
-                "liquid_assets": liquid_assets,
-                "illiquid_assets": illiquid_assets,
-                "required_liquidity": required_liquidity,
-                "liquidity_shortfall": liquidity_shortfall,
-                "forced_sale": forced_sale,
-                "forced_sale_loss": forced_sale_loss,
-                "other_annual_cash_need": other_cash_need,
-                "ending_assets": ending,
-                "operating_expenses": expenses,
-                "required_support": required_support,
-                "payout_support_gap": payout_support_gap,
-                "payout_adequacy_ratio": payout_adequacy_ratio,
-                "nominal_running_peak": nominal_peak,
-                "nominal_drawdown": nominal_drawdown,
-                "inflation": inflation,
-                "cumulative_inflation_index": cumulative_inflation,
-                "real_ending_assets": real_ending,
-                "real_running_peak": real_peak,
-                "real_drawdown": real_drawdown,
-                "payout_shortfall_indicator": shortfall_indicator,
-                "payout_shortfall_amount": shortfall_amount,
-                "relative_shortfall_depth": relative_shortfall_depth,
-                "insolvent": ending <= 0.0,
-            }
-        )
-
+        cumulative_inflation *= 1 + inflation
+        real = ending / cumulative_inflation
+        real_peak = max(real_peak, real)
+        out.append(dict(
+            year=int(market["year"]), dominant_condition=market.get("dominant_condition", ""),
+            beginning_assets=beginning, portfolio_return=r, investment_gain=gain,
+            pre_payout_assets=pre, planned_payout=planned, actual_payout=actual,
+            capital_call=capital_call, capital_call_paid=capital_paid, unpaid_capital_call=capital_call-capital_paid,
+            special_draw_requested=special_draw, special_draw_paid=min(special_draw,max(0.,actual-policy_planned)),
+            effective_liquid_haircut=haircut,
+            endowment_gifts=gifts, other_endowment_changes=changes,
+            liquid_assets=liquid_assets, moderately_liquid_assets=moderate_assets, illiquid_assets=illiquid_assets,
+            ending_liquid_assets=buckets[0], ending_moderately_liquid_assets=buckets[1], ending_illiquid_assets=buckets[2],
+            required_liquidity=reserve + requested_other + capital_call if liquidity.enabled else np.nan,
+            liquidity_shortfall=max(0., planned + requested_other + capital_call + reserve - liquid_assets * (1-haircut)) if liquidity.enabled else np.nan,
+            forced_sale=forced_sale, forced_sale_loss=forced_loss, moderately_liquid_sale=moderate_sale,
+            other_annual_cash_need=requested_other, other_cash_paid=other_paid,
+            unpaid_other_cash_need=requested_other-other_paid, reserve_target=reserve,
+            reserve_shortfall=max(0., reserve-max(0., accessible-total_paid)),
+            ending_assets=ending, accounting_residual=residual, operating_expenses=expenses,
+            required_support=support, payout_support_gap=max(0., support-actual),
+            payout_adequacy_ratio=actual/support if support > 0 else np.nan,
+            nominal_running_peak=nominal_peak, nominal_drawdown=ending/nominal_peak-1,
+            inflation=inflation, cumulative_inflation_index=cumulative_inflation,
+            real_ending_assets=real, real_running_peak=real_peak, real_drawdown=real/real_peak-1,
+            real_actual_payout=actual/cumulative_inflation,
+            payout_shortfall_indicator=int(shortfall > 1e-10), payout_shortfall_amount=shortfall,
+            relative_shortfall_depth=shortfall/planned if planned > 0 else 0.,
+            return_coverage_shortfall_indicator=int(coverage_gap > 1e-10),
+            return_coverage_shortfall_amount=coverage_gap,
+            relative_coverage_shortfall_depth=coverage_gap/planned if planned > 0 else 0.,
+            effective_payout_requirement=planned/beginning if beginning > 0 else np.nan,
+            real_corpus_below_threshold=int(real < config.initial_endowment*config.real_corpus_threshold-1e-10),
+            insolvent=ending <= 1e-12))
         history.append(ending)
         current = ending
-        expenses *= (1.0 + institutional.annual_expense_growth)
-
+        expenses *= 1 + expense_growth
     return pd.DataFrame(out)
+
+
+def validate_parameters(config, institution, liquidity):
+    numeric = [v for obj in (config, institution, liquidity) for v in vars(obj).values()
+               if isinstance(v, (int, float)) and not isinstance(v, bool)]
+    if not np.isfinite(numeric).all():
+        raise ValueError("All numeric inputs must be finite.")
+    if min(config.initial_endowment, config.prior_endowment_1y, config.prior_endowment_2y) <= 0:
+        raise ValueError("Starting and prior endowments must be positive.")
+    if config.horizon_years < 1 or config.n_sims < 1 or config.volatility_multiplier <= 0 or (config.annual_inflation is not None and config.annual_inflation <= -1):
+        raise ValueError("Invalid horizon, path count, volatility or inflation.")
+    if not 0 < config.alpha < 1 or not 0 < config.real_corpus_threshold <= 1:
+        raise ValueError("Confidence and corpus threshold must lie in their valid ranges.")
+    if institution.spending_rule not in ["Trailing average", "Current assets"] or not 1 <= institution.smoothing_years <= 3:
+        raise ValueError("Use Current assets or a 1–3 year Trailing average rule.")
+    if not 0 <= institution.effective_spending_rate <= 1 or institution.gift_rate < 0 or institution.expenses_to_endowment_ratio < 0:
+        raise ValueError("Invalid spending, gift, or expense assumption.")
+    floor, cap = institution.annual_payout_growth_floor, institution.annual_payout_growth_cap
+    if any(x is not None and x < -1 for x in (floor, cap)) or (floor is not None and cap is not None and floor > cap):
+        raise ValueError("Invalid payout growth floor/cap.")
+    if institution.annual_expense_growth < -1 or institution.support_ratio < 0:
+        raise ValueError("Invalid support or expense growth assumption.")
+    if not 0 <= liquidity.liquid_share <= 1 or not 0 <= liquidity.illiquid_share <= 1 or liquidity.liquid_share + liquidity.illiquid_share > 1 + 1e-12:
+        raise ValueError("Liquid and illiquid shares must be nonnegative and sum to at most 100%.")
+    if min(liquidity.other_annual_cash_need, liquidity.minimum_cash_reserve, liquidity.liquidity_buffer_years) < 0:
+        raise ValueError("Cash obligations and reserves cannot be negative.")
+    if not 0 <= liquidity.forced_sale_discount < 1 or not 0 <= liquidity.liquid_share_haircut <= 1 or not 0 <= liquidity.moderately_liquid_access <= 1:
+        raise ValueError("Invalid liquidity access or discount assumption.")
+    if config.adverse_probability is not None and not 0 <= config.adverse_probability <= 1:
+        raise ValueError("Adverse probability must be between zero and one.")
+    if config.adverse_std is not None and config.adverse_std <= 0:
+        raise ValueError("Adverse volatility must be positive.")
+
+
+def longest_spell(indicators):
+    longest = current = 0
+    for flag in indicators:
+        current = current + 1 if flag else 0
+        longest = max(longest, current)
+    return longest
+
+
+def recovery_statistics(path):
+    """First threshold breach to first recovery; incomplete spells are right censored."""
+    below = path["real_corpus_below_threshold"].to_numpy(bool)
+    if not below.any():
+        return dict(recovery_years=np.nan, recovery_censored=False, erosion_spell_observed=0)
+    start = int(np.flatnonzero(below)[0])
+    recoveries = np.flatnonzero(~below[start+1:])
+    observed = int(recoveries[0]+1) if len(recoveries) else len(below)-start
+    return dict(recovery_years=observed if len(recoveries) else np.nan,
+                recovery_censored=not bool(len(recoveries)), erosion_spell_observed=observed)
 
 
 def historical_validation(
@@ -470,12 +597,12 @@ def historical_validation(
 ) -> pd.DataFrame:
     config = config or SimulationConfig(start_year=2013, horizon_years=10, n_sims=1)
     institutional = institutional or institutional_params_from_data(data, "Private", "Base")
-    liquidity = liquidity or liquidity_params_from_data(data, enabled=False)
+    liquidity = liquidity or liquidity_params_from_data(data, enabled=True)
 
-    q = data.p4_quarterly.copy()
+    q = data.portfolio_quarterly.copy()
     q["year"] = q["quarter"].str[:4].astype(int)
     q = q[(q["year"] >= 2013) & (q["year"] <= 2022)].copy()
-    annual = quarterly_to_annual(q[["p4_return", "condition", "cpi_yoy"]], start_year=2013)
+    annual = quarterly_to_annual(q[["portfolio_return", "condition", "cpi_yoy"]], start_year=2013)
     return run_path(annual, config, institutional, liquidity)
 
 
@@ -505,7 +632,7 @@ def _tail_var_es(losses: np.ndarray, alpha: float) -> Tuple[float, float]:
         return np.nan, np.nan
     alpha = float(np.clip(alpha, 0.50, 0.999))
     var = float(np.quantile(losses, alpha))
-    k = max(1, int(math.ceil((1.0 - alpha) * losses.size)))
+    k = max(1, int(math.ceil((1.0 - alpha) * losses.size - 1e-12)))
     es = float(np.sort(losses)[-k:].mean())
     return var, es
 
@@ -515,18 +642,21 @@ def run_monte_carlo(
     config: SimulationConfig,
     institutional: InstitutionalParams,
     liquidity: LiquidityParams,
-    p4_history: Optional[pd.DataFrame] = None,
+    portfolio_history: Optional[pd.DataFrame] = None,
     keep_paths: bool = True,
+    path_transform=None,
+    year_overrides: Optional[pd.DataFrame] = None,
 ) -> Dict[str, object]:
     from portfolio_return_simulation import checked_history, fit_mixture
-    history = checked_history(data.p4_quarterly if p4_history is None else p4_history)
+    validate_parameters(config, institutional, liquidity)
+    history = checked_history(data.portfolio_quarterly if portfolio_history is None else portfolio_history)
     if config.n_sims < 1 or config.horizon_years < 1:
         raise ValueError("Use a positive simulation count and horizon.")
     if not 1 <= config.block_size_quarters <= len(history):
         raise ValueError("Block size must fit within the history.")
     if config.volatility_multiplier <= 0 or (config.annual_inflation is not None and config.annual_inflation <= -1):
         raise ValueError("Invalid volatility or inflation assumption.")
-    mixture = fit_mixture(history["p4_return"].to_numpy()) if "mixture" in config.return_method.lower() else None
+    mixture = fit_mixture(history["portfolio_return"].to_numpy()) if "mixture" in config.return_method.lower() else None
     rng = np.random.default_rng(config.seed)
     quarterly_returns = []
     investment_drawdowns = []
@@ -534,13 +664,16 @@ def run_monte_carlo(
     path_records = []
 
     for path_id in range(config.n_sims):
-        qpath = sample_quarterly_path(rng, data, config, p4_history=history, mixture_parameters=mixture)
-        returns = qpath["p4_return"].to_numpy()
+        qpath = sample_quarterly_path(rng, data, config, portfolio_history=history, mixture_parameters=mixture)
+        if path_transform is not None:qpath=path_transform(rng,qpath)
+        if len(qpath)!=config.horizon_years*4 or not np.isfinite(qpath[['portfolio_return','cpi_yoy']].to_numpy()).all() or (qpath.portfolio_return < -1).any() or (qpath.cpi_yoy <= -1).any():
+            raise ValueError('Invalid stressed quarterly path.')
+        returns = qpath["portfolio_return"].to_numpy()
         quarterly_returns.append(returns)
         wealth = np.r_[1.0, np.cumprod(1.0 + returns)]
         investment_drawdowns.append(float((wealth / np.maximum.accumulate(wealth) - 1).min()))
         annual_market = quarterly_to_annual(qpath, config.start_year)
-        path = run_path(annual_market, config, institutional, liquidity)
+        path = run_path(annual_market, config, institutional, liquidity,year_overrides=year_overrides)
         path.insert(0, "path_id", path_id)
         if keep_paths:
             annual_records.append(path)
@@ -551,6 +684,18 @@ def run_monte_carlo(
         path_records.append(
             {
                 "path_id": path_id,
+                "coverage_shortfall_years": int(path["return_coverage_shortfall_indicator"].sum()),
+                "longest_coverage_shortfall_spell": longest_spell(path["return_coverage_shortfall_indicator"]),
+                "longest_funding_shortfall_spell": longest_spell(path["payout_shortfall_indicator"]),
+                "erosion_years": int(path["real_corpus_below_threshold"].sum()),
+                "longest_erosion_spell": longest_spell(path["real_corpus_below_threshold"]),
+                "cumulative_real_payout": float(path["real_actual_payout"].sum()),
+                "total_unpaid_other_cash": float(path["unpaid_other_cash_need"].sum()),
+                "coverage_gap_sum": float(path["return_coverage_shortfall_amount"].sum()),
+                "relative_coverage_gap_sum": float(path["relative_coverage_shortfall_depth"].sum()),
+                "funding_gap_sum": float(path["payout_shortfall_amount"].sum()),
+                "relative_funding_gap_sum": float(path["relative_shortfall_depth"].sum()),
+                **recovery_statistics(path),
                 "terminal_nominal_assets": terminal_nominal,
                 "terminal_real_assets": terminal_real,
                 "terminal_real_corpus_loss": max(0.0, 1.0 - terminal_real / config.initial_endowment),
@@ -591,10 +736,10 @@ def run_monte_carlo(
         "median_terminal_real_assets": float(path_summary["terminal_real_assets"].median()),
         "p05_terminal_real_assets": float(path_summary["terminal_real_assets"].quantile(0.05)),
         "p95_terminal_real_assets": float(path_summary["terminal_real_assets"].quantile(0.95)),
-        "annual_shortfall_probability": float(annual_results["payout_shortfall_indicator"].mean()) if not annual_results.empty else np.nan,
+        "annual_shortfall_probability": float(path_summary["shortfall_years"].sum() / (config.n_sims * config.horizon_years)),
         "probability_at_least_one_shortfall": float(path_summary["at_least_one_shortfall"].mean()),
-        "average_shortfall_amount": float(shortfall_events["payout_shortfall_amount"].mean()) if not shortfall_events.empty else 0.0,
-        "average_relative_shortfall_depth": float(shortfall_events["relative_shortfall_depth"].mean()) if not shortfall_events.empty else 0.0,
+        "average_shortfall_amount": float(path_summary["funding_gap_sum"].sum() / max(1, path_summary["shortfall_years"].sum())),
+        "average_relative_shortfall_depth": float(path_summary["relative_funding_gap_sum"].sum() / max(1, path_summary["shortfall_years"].sum())),
         "var_terminal_real_corpus_loss": var,
         "expected_shortfall_terminal_real_corpus_loss": es,
         "probability_any_support_gap": float((path_summary["support_gap_years"] > 0).mean()),
@@ -602,6 +747,21 @@ def run_monte_carlo(
         "median_max_real_drawdown": float(path_summary["max_real_drawdown"].median()),
     }
 
+    metrics.update({
+        "annual_coverage_shortfall_probability": float(path_summary.coverage_shortfall_years.sum() / (config.n_sims*config.horizon_years)),
+        "probability_any_coverage_shortfall": float((path_summary.coverage_shortfall_years > 0).mean()),
+        "conditional_coverage_shortfall_amount": float(path_summary.coverage_gap_sum.sum()/max(1, path_summary.coverage_shortfall_years.sum())),
+        "conditional_relative_coverage_shortfall_depth": float(path_summary.relative_coverage_gap_sum.sum()/max(1, path_summary.coverage_shortfall_years.sum())),
+        "median_longest_coverage_spell": float(path_summary.longest_coverage_shortfall_spell.median()),
+        "median_longest_funding_spell": float(path_summary.longest_funding_shortfall_spell.median()),
+        "probability_real_corpus_erosion": float((path_summary.erosion_years > 0).mean()),
+        "median_erosion_years": float(path_summary.erosion_years.median()),
+        "median_longest_erosion_spell": float(path_summary.longest_erosion_spell.median()),
+        "median_completed_recovery_years": float(path_summary.recovery_years.median()) if path_summary.recovery_years.notna().any() else np.nan,
+        "probability_unrecovered_given_erosion": float(path_summary.loc[path_summary.erosion_years > 0, "recovery_censored"].mean()) if (path_summary.erosion_years > 0).any() else np.nan,
+        "median_cumulative_real_payout": float(path_summary.cumulative_real_payout.median()),
+        "probability_unpaid_other_obligation": float((path_summary.total_unpaid_other_cash > 1e-10).mean()),
+    })
     return {
         "metrics": metrics,
         "path_summary": path_summary,
@@ -631,7 +791,7 @@ def stress_configs(base: SimulationConfig, recession_quarters: int = 6, inflatio
 if __name__ == "__main__":
     data = load_default_data()
     inst = institutional_params_from_data(data, "Private", "Base")
-    liq = liquidity_params_from_data(data, enabled=False)
+    liq = liquidity_params_from_data(data, enabled=True)
 
     print("=== Historical validation ===")
     hist_cfg = SimulationConfig(start_year=2013, horizon_years=10, n_sims=1)

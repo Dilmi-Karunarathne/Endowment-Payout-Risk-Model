@@ -1,7 +1,7 @@
-"""P4 portfolio-level Normal mixture and controlled bootstrap comparison.
+"""selected portfolio portfolio-level Normal mixture and controlled bootstrap comparison.
 
 Quarterly arithmetic returns; historical calibration is an assumption, not a forecast.
-P4 allocation is held constant. No asset-level drift, trading costs or trade engine.
+selected portfolio allocation is held constant. No asset-level drift, trading costs or trade engine.
 """
 import numpy as np
 import pandas as pd
@@ -11,7 +11,7 @@ SEED = 42
 
 def fit_mixture(history):
     """
-    Estimate two Normal components from P4's quarterly returns.
+    Estimate two Normal components from selected portfolio's quarterly returns.
 
     Lower mean = adverse component.
     Higher mean = ordinary component.
@@ -50,6 +50,8 @@ def fit_mixture(history):
 
 def sample_mixture(rng, quarters, assumptions):
     """Independent component choice per quarter; reject returns <= -100%."""
+    if not all(np.isfinite(v) for v in assumptions.values()) or not 0 <= assumptions["adverse_probability"] <= 1 or min(assumptions["ordinary_std"], assumptions["adverse_std"]) <= 0:
+        raise ValueError("Invalid Normal component assumptions.")
     adverse = rng.random(quarters) < assumptions["adverse_probability"]
     means = np.where(adverse, assumptions["adverse_mean"], assumptions["ordinary_mean"])
     stds = np.where(adverse, assumptions["adverse_std"], assumptions["ordinary_std"])
@@ -65,7 +67,7 @@ def sample_mixture(rng, quarters, assumptions):
 def checked_history(table):
     table = table.sort_values("quarter").reset_index(drop=True).copy()
     quarters = pd.PeriodIndex(table["quarter"], freq="Q")
-    returns = table["p4_return"].to_numpy(dtype=float)
+    returns = table["portfolio_return"].to_numpy(dtype=float)
     if quarters.has_duplicates or not np.all(np.diff(quarters.asi8) == 1):
         raise ValueError("Historical quarters must be unique and consecutive.")
     if len(returns) < 12 or not np.isfinite(returns).all() or (returns <= -1).any() or returns.std() < 1e-8:
@@ -75,7 +77,7 @@ def checked_history(table):
     return table
 
 
-def compare_return_methods(data, config, institution, liquidity, p4_history=None):
+def compare_return_methods(data, config, institution, liquidity, portfolio_history=None):
     """Change ONLY the generator; share portfolio, settings and fixed inflation.
 
     If the dashboard uses sampled inflation, use the historical CPI YoY mean
@@ -85,15 +87,15 @@ def compare_return_methods(data, config, institution, liquidity, p4_history=None
     from dataclasses import replace
     from endowment_simulation_model import run_monte_carlo
 
-    history = checked_history(data.p4_quarterly if p4_history is None else p4_history)
+    history = checked_history(data.portfolio_quarterly if portfolio_history is None else portfolio_history)
     inflation = config.annual_inflation
     if inflation is None:
         inflation = float(history["cpi_yoy"].mean())
     shared = replace(config, annual_inflation=inflation, stress_state=None, stress_quarters=0)
     rows = {}
     results = {}
-    for method in ["Quarterly block bootstrap", "Two-component Normal mixture"]:
-        result = run_monte_carlo(data, replace(shared, return_method=method), institution, liquidity, p4_history=history)
+    for method in ["Single Normal", "Two-component Normal mixture", "Quarterly block bootstrap"]:
+        result = run_monte_carlo(data, replace(shared, return_method=method), institution, liquidity, portfolio_history=history)
         results[method] = result
         m = result["metrics"]
         rows[method] = {
@@ -108,7 +110,7 @@ def compare_return_methods(data, config, institution, liquidity, p4_history=None
             "Probability of any support gap (%)": 100*m["probability_any_support_gap"],
             f"ES {config.alpha:.0%} terminal real-corpus loss (%)": 100*m["expected_shortfall_terminal_real_corpus_loss"],
         }
-    return pd.DataFrame(rows), fit_mixture(history["p4_return"].to_numpy()), inflation, results
+    return pd.DataFrame(rows), fit_mixture(history["portfolio_return"].to_numpy()), inflation, results
 
 
 if __name__ == "__main__":
