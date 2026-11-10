@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from dashboard_theme import palette, apply_theme
 
 TEAL = '#59C9BE'
 AMBER = '#E3B46D'
@@ -28,34 +29,19 @@ def apply_style():
     .empty-state p {color:#AABAC5;margin:0;line-height:1.7;}
     .selection {color:#AABAC5;font-size:.9rem;margin:0 0 18px 0;}
     @media (max-width:700px) {.block-container {padding:1rem;} h1 {font-size:1.8rem !important;} [data-testid="stMetricValue"] {font-size:1.9rem;}}
-    /* Card layout only: colors and theme remain the original app defaults. */
-    [class*="st-key-open_"] button {width:100%;min-height:350px;align-items:flex-start;justify-content:flex-start;text-align:left;padding:20px 18px 180px;background-size:calc(100% - 32px) 150px;background-repeat:no-repeat;background-position:center bottom 16px;}
-    [class*="st-key-open_"] button p {white-space:pre-line;text-align:left;}
     </style>''',unsafe_allow_html=True)
+    apply_theme()
 
 
 def chart_theme():
-    """Read chart appearance without changing the app's active theme."""
-    def option(key):
-        try:return st.get_option(key)
-        except (KeyError,RuntimeError):return None
-    try:
-        dark=st.context.theme.type=='dark'
-    except (AttributeError,KeyError):
-        dark=option('theme.base')=='dark'
-    configured=option('theme.chartCategoricalColors')
-    colors=list(configured) if configured else (['#83C9FF','#FFABAB','#7DEFA1','#BDA6FF'] if dark else ['#0068C9','#C55A11','#16834B','#8055AD'])
-    if len(colors)<2:colors+=['#C55A11','#16834B']
-    primary=option('theme.primaryColor')
-    if primary:colors=[primary]+[color for color in colors if color!=primary]
-    return {'dark':dark,'colors':colors,'text':option('theme.textColor') or ('#FAFAFA' if dark else '#262730'),
-        'grid':'#34434D' if dark else '#E5E7EB'}
+    c = palette()
+    return {'dark':False,'colors':c['chart_colors'],'text':c['chart_text'],'grid':c['chart_grid']}
 
 
 def chart_band_fill():
     color=chart_theme()['colors'][0].lstrip('#')
     if len(color)!=6:return 'rgba(0,104,201,.16)'
-    return 'rgba('+','.join(str(int(color[i:i+2],16)) for i in (0,2,4))+',.16)'
+    return 'rgba('+','.join(str(int(color[i:i+2],16)) for i in (0,2,4))+','+str(palette()['chart_band_opacity'])+')'
 
 
 def style_figure(fig, y_title=None, height=330, recolor=True):

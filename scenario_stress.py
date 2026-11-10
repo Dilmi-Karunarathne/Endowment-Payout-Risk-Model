@@ -90,13 +90,11 @@ class StressScenario:
 
 
 # Illustrative instantaneous asset-class shocks (hypothetical, not calibrated).
-EQUITY_CRASH_SHOCKS = {
-    "us_large_cap": -.35, "us_small_cap": -.40, "developed_ex_us": -.38,
-    "emerging_markets": -.45, "venture_capital": -.30, "private_equity": -.22,
-    "hedge_funds": -.12, "investment_grade_corporate_bonds": .04,
-    "high_yield_fixed_income": -.18, "cash_tbill": 0., "treasuries": .05,
-    "inflation_linked_bonds": .02, "commodities": -.20,
-}
+from pathlib import Path
+_r1_shocks=pd.read_csv(Path(__file__).parent/'data/r1/asset_shock_recommendation.csv')
+EQUITY_CRASH_SHOCKS=dict(zip(_r1_shocks.loc[_r1_shocks.In_R1_Strategies,'Data_Asset_ID'],
+                           _r1_shocks.loc[_r1_shocks.In_R1_Strategies,'Base_Shock_GFC_Joint_Window']))
+
 RATE_SHOCK_SHOCKS = {
     "us_large_cap": -.20, "us_small_cap": -.25, "developed_ex_us": -.20,
     "emerging_markets": -.22, "venture_capital": -.25, "private_equity": -.12,
@@ -105,19 +103,8 @@ RATE_SHOCK_SHOCKS = {
     "inflation_linked_bonds": -.10, "commodities": .10,
 }
 
-LIQUIDITY_SQUEEZE = dict(
-    enabled=True,
-    liquidity_buffer_years=1.5,
-    forced_sale_discount=0.25,
-    allow_forced_sales=True,
-)
-
-LIQUIDITY_FREEZE = dict(
-    enabled=True,
-    liquidity_buffer_years=1.0,
-    forced_sale_discount=0.35,
-    allow_forced_sales=False,  # secondaries closed / funds gated: payout is cut instead
-)
+LIQUIDITY_SQUEEZE = {}
+LIQUIDITY_FREEZE = {}
 
 
 def default_scenarios() -> List[StressScenario]:
@@ -172,7 +159,7 @@ def default_scenarios() -> List[StressScenario]:
         ),
         StressScenario(
             "Lost decade", "Hypothetical market",
-            "A 5% multiplicative annual return drag for ten years.",
+            "A 5 percentage-point additive annual return drag for ten years.",
             MarketShock(return_drag_annual=-0.05, drag_years=10),
         ),
         # --- Endowment / institutional ------------------------------------------------------
@@ -194,15 +181,15 @@ def default_scenarios() -> List[StressScenario]:
         ),
         StressScenario(
             "Liquidity squeeze", "Endowment",
-            "Liquidity constraints ON: 1.5-year payout buffer, 60% haircut on accessible liquid assets and 6% capital "
-            "calls for 3 years; illiquid assets sold at a 25% discount if the payout can't be funded.",
+            "60% restriction on sale eligibility and 6% capital "
+            "calls for 3 years; shared time-to-cash matrix applies, with no additional buffer.",
             endowment=EndowmentShock(capital_call_rate=0.06, capital_call_years=3, liquid_haircut_add=0.60,
                                      liquid_haircut_years=3, liquidity_overrides=dict(LIQUIDITY_SQUEEZE)),
         ),
         StressScenario(
             "Severe liquidity freeze", "Endowment",
-            "Liquidity constraints ON: 1-year buffer, 75% haircut on accessible liquid assets, 6% capital calls for "
-            "2 years and no forced sales possible, so any funding gap becomes a payout cut.",
+            "75% restriction on sale eligibility, 6% capital calls for "
+            "2 years; shared matrix costs apply to remaining eligible sales.",
             endowment=EndowmentShock(capital_call_rate=0.06, capital_call_years=2, liquid_haircut_add=0.75,
                                      liquid_haircut_years=2, liquidity_overrides=dict(LIQUIDITY_FREEZE)),
         ),
@@ -226,8 +213,42 @@ def default_scenarios() -> List[StressScenario]:
     ]
 
 
-def scenario_library() -> Dict[str, StressScenario]:
-    return {s.name: s for s in default_scenarios()}
+def scenario_library(inst=None, severity="Standard", data=None) -> Dict[str, StressScenario]:
+    library={s.name: s for s in default_scenarios()}
+    if inst is not None:
+        a,b=r2_stress_defaults(inst,severity)
+        expense=EndowmentShock(expense_growth_add=a.expense_growth-inst.annual_expense_growth,expense_growth_years=a.expense_years)
+        library['Donor retreat'].endowment=EndowmentShock(gift_multiplier=b.gift_multiplier,gift_years=b.gift_years)
+        library['Donor retreat'].narrative='R2 cohort-specific gift reduction followed by immediate recovery.'
+        for name in ['Spending & expense pressure','Stagflation + spending pressure']:
+            library[name].endowment=expense
+            library[name].narrative='R2 one-year expense stress; normal growth resumes from the higher level.'
+        severe=r2_stress_defaults(inst,'Severe')[1]
+        combined=library['Severe combined: GFC + donors + liquidity']
+        combined.endowment.gift_multiplier=severe.gift_multiplier
+        combined.endowment.gift_years=severe.gift_years
+        combined.endowment.special_draw_rate=0.
+        combined.narrative='GFC replay, R2 severe gift stress and provisional portfolio liquidity stress.'
+        library.pop('Special appropriation',None)
+        if data is not None:
+            w=data.portfolio_weights.set_index('asset').weight
+            private=w[['private_equity','venture_capital']].sum()
+            liquid=w.drop(['private_equity','venture_capital','hedge_funds']).sum()
+            freeze=w[['emerging_markets','investment_grade_corporate_bonds','high_yield_fixed_income']].sum()/liquid
+            for name,severe_case in [('Liquidity squeeze',False),('Severe liquidity freeze',True),('Severe combined: GFC + donors + liquidity',True)]:
+                e=library[name].endowment
+                e.capital_call_rate=(.03 if severe_case else .02)*private/.128
+                e.capital_call_years=4 if severe_case else 3
+                e.liquid_haircut_add=freeze if severe_case else 0.
+                e.liquid_haircut_years=2 if severe_case else 1
+                library[name].narrative='R1 private-exposure-scaled net-call proxy; severe restrictions calibrated to EM, IG and HY exposure. Liquidity monitoring only.'
+        if severity=='Severe':
+            library['Equity crash (asset-class shock)'].market.asset_shocks=dict(zip(
+                _r1_shocks.loc[_r1_shocks.In_R1_Strategies,'Data_Asset_ID'],
+                _r1_shocks.loc[_r1_shocks.In_R1_Strategies,'Severe_Shock_Scaled_to_Fed_2026']))
+        library['Equity crash (asset-class shock)'].narrative='R1 supplied joint-window asset shocks; severe values use R1’s Fed-scenario scaling.'
+
+    return library
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +305,7 @@ def make_path_transform(data: ModelData, shock: MarketShock, portfolio_history: 
     replay = _replay_rows(data, shock.replay_quarters, portfolio_history) if shock.replay_quarters else None
     n_replay = 0 if replay is None else len(replay)
     instant = market_portfolio_shock(data, shock)
-    drag_q = (1.0 + shock.return_drag_annual) ** 0.25 - 1.0 if shock.return_drag_annual else 0.0
+    drag_q = shock.return_drag_annual / 4.0
 
     if n_replay == 0 and instant == 0.0 and drag_q == 0.0 and shock.inflation_add == 0.0:
         return None
@@ -304,10 +325,38 @@ def make_path_transform(data: ModelData, shock: MarketShock, portfolio_history: 
             r[0] = (1.0 + r[0]) * (1.0 + instant) - 1.0
         if drag_q != 0.0:
             m = not_replay & (idx < n_replay + shock.drag_years * 4)
-            r[m] = (1.0 + r[m]) * (1.0 + drag_q) - 1.0
+            r[m] += drag_q
         if shock.inflation_add != 0.0:
             m = not_replay & (idx < n_replay + shock.inflation_years * 4)
             cpi[m] = cpi[m] + shock.inflation_add
+        if "asset_returns" in q:
+            # Apply shocks to the underlying assets, then recompute investment results
+            # from actual drifting holdings in run_path, never double-count strategy returns.
+            for t in range(n):
+                values=np.array(q.at[t,'asset_returns'],copy=True)
+                if t<n_replay:
+                    row=data.r1_joint.set_index('quarter').loc[shock.replay_quarters[t]]
+                    from r1_model import ASSETS
+                    values=row[ASSETS].to_numpy(float)
+                    q.at[t,'r1_condition']=row.condition
+                    q.at[t,'cpi_quarter']=row.cpi_quarter
+                    q.at[t,'freeze_rebalance']=True
+                    q.at[t,'return_add']=0.
+                if t==0 and instant!=0:
+                    if n_replay: raise ValueError('Use either replay or instantaneous shock, not both.')
+                    from r1_model import ASSETS
+                    factor=np.array([shock.asset_shocks.get(a,0.) for a in ASSETS]) if shock.asset_shocks and shock.portfolio_shock is None else instant
+                    values=(1+values)*(1+factor)-1
+                if n_replay<=t<n_replay+shock.drag_years*4:
+                    q.at[t,'return_add']+=drag_q
+                if n_replay<=t<n_replay+shock.inflation_years*4:
+                    annual=(1+q.at[t,'cpi_quarter'])**4-1+shock.inflation_add
+                    q.at[t,'cpi_quarter']=(1+annual)**.25-1
+                q.at[t,'asset_returns']=values
+            q['cpi_yoy']=(1+q.cpi_quarter)**4-1
+            cpi=q.cpi_yoy.to_numpy()
+        elif 'cpi_quarter' in q:
+            q['cpi_quarter']=(1+cpi)**.25-1
         q["portfolio_return"] = r
         q["cpi_yoy"] = cpi
         return q
@@ -334,6 +383,23 @@ def build_year_overrides(shock: EndowmentShock, horizon: int) -> Optional[pd.Dat
 
     neutral = all(np.allclose(ov[k].to_numpy(dtype=float), v) for k, v in YEAR_OVERRIDE_DEFAULTS.items())
     return None if neutral else ov
+
+
+def scenario_year_overrides(scenario, horizon):
+    ov = build_year_overrides(scenario.endowment, horizon)
+    if ov is None:
+        ov = pd.DataFrame({k:[v]*horizon for k,v in YEAR_OVERRIDE_DEFAULTS.items()})
+    m,e = scenario.market,scenario.endowment
+    # Whole annual funding dates whose year overlaps the stated stress window.
+    inflation = m.regime_state == "Elevated inflation" or m.inflation_add > 0 or scenario.name.startswith("Rate shock") or any(q.startswith("2022") for q in m.replay_quarters)
+    # Asset-specific shocks also use adverse liquidity in their first year.
+    recession = (m.regime_state == "Recession" or any(q.startswith(("2008","2009","2020")) for q in m.replay_quarters) or e.liquid_haircut_add > 0 or bool(m.asset_shocks) or m.return_drag_annual < 0 or (m.portfolio_shock is not None and m.portfolio_shock < 0))
+    duration = max(m.regime_quarters/4, len(m.replay_quarters)/4 + m.drag_years,
+                   len(m.replay_quarters)/4 + m.inflation_years, e.liquid_haircut_years)
+    if inflation or recession:
+        n = min(horizon, max(1,int(np.ceil(duration))))
+        ov.loc[:n-1,"liquidity_regime"] = 2 if inflation else 1
+    return ov
 
 
 def scenario_config(cfg: SimulationConfig, scenario: StressScenario, data: Optional[ModelData] = None,
@@ -366,8 +432,8 @@ def add_derived_columns(path: pd.DataFrame) -> pd.DataFrame:
     or payout cuts are needed). Coverage is NaN when liquidity constraints are off."""
     out = path.copy()
     out["real_payout"] = out["actual_payout"] / out["cumulative_inflation_index"]
-    cash = (out["liquid_assets"] * (1-out["effective_liquid_haircut"]) - out["required_liquidity"]).clip(lower=0.0)
-    out["liquidity_coverage"] = cash / out["planned_payout"].where(out["planned_payout"] > 0)
+    cash = (out["cash_before_sales"] - out["required_liquidity"]).clip(lower=0.0)
+    out["liquidity_coverage"] = out["minimum_liquidity_coverage"] if "minimum_liquidity_coverage" in out else cash / out["planned_payout"].where(out["planned_payout"] > 0)
     return out
 
 
@@ -378,13 +444,14 @@ def run_stress_scenario(
     liq: LiquidityParams,
     scenario: StressScenario,
     portfolio_history: Optional[pd.DataFrame] = None,
+    baseline_result=None,
 ) -> Dict[str, object]:
     validate_scenario(scenario)
     scfg = scenario_config(cfg, scenario, data, portfolio_history)
     sliq = scenario_liquidity(liq, scenario)
     transform = make_path_transform(data, scenario.market, portfolio_history)
-    overrides = build_year_overrides(scenario.endowment, cfg.horizon_years)
-    res = run_monte_carlo(data, scfg, inst, sliq, portfolio_history=portfolio_history, keep_paths=True,
+    overrides = scenario_year_overrides(scenario, cfg.horizon_years)
+    res = dict(baseline_result) if baseline_result is not None and scenario == scenario_library()["Baseline"] else run_monte_carlo(data, scfg, inst, sliq, portfolio_history=portfolio_history, keep_paths=True,
                           path_transform=transform, year_overrides=overrides)
     ps = res["path_summary"]
     m = dict(res["metrics"])
@@ -425,6 +492,7 @@ def run_stress_suite(
     scenarios: Sequence[StressScenario],
     portfolio_history: Optional[pd.DataFrame] = None,
     progress=None,
+    baseline_result=None,
 ) -> Tuple[pd.DataFrame, Dict[str, Dict[str, object]]]:
     """Run each scenario with the same seed (common random numbers) and return a comparison table."""
     names = [s.name for s in scenarios]
@@ -432,7 +500,7 @@ def run_stress_suite(
         scenarios = [scenario_library()["Baseline"], *scenarios]
     results: Dict[str, Dict[str, object]] = {}
     for i, sc in enumerate(scenarios):
-        results[sc.name] = run_stress_scenario(data, cfg, inst, liq, sc, portfolio_history)
+        results[sc.name] = run_stress_scenario(data, cfg, inst, liq, sc, portfolio_history, baseline_result=baseline_result if sc == scenario_library()["Baseline"] else None)
         if progress is not None:
             progress((i + 1) / len(scenarios), sc.name)
 
@@ -443,8 +511,6 @@ def run_stress_suite(
         row=comparison_row(name,res)
         ar=res['annual_results']; g=ar.groupby('path_id')
         row.update({'Change in ending real endowment ($M)':res['metrics']['median_terminal_real_assets']-base,
-            'Pr(forced sale)':res['metrics']['probability_forced_sale'],
-            'Mean forced-sale loss ($M)':res['metrics']['mean_forced_sale_loss'],
             'Pr(unfunded capital call)':float((g.unpaid_capital_call.sum()>1e-10).mean()),
             'Pr(institutional support gap)':res['metrics']['probability_any_support_gap']})
         rows.append(row)
@@ -508,15 +574,17 @@ def run_deterministic_stress(
         # Deterministic regime stress: use the historical mean selected portfolio return / CPI of that regime for the forced quarters
         # (any replayed quarters are overwritten with the actual history by the transform below).
         hist = data.portfolio_quarterly if portfolio_history is None else portfolio_history
+        from r1_model import regime_name
+        state=regime_name(m.regime_state) if data.r1_targets is not None else m.regime_state
         k = min(int(m.regime_quarters), len(q))
-        q.loc[: k - 1, "portfolio_return"] = float(hist.loc[hist["condition"] == m.regime_state, "portfolio_return"].mean())
-        q.loc[: k - 1, "cpi_yoy"] = float(data.condition_history.loc[data.condition_history["condition"] == m.regime_state, "cpi_yoy"].mean())
+        q.loc[: k - 1, "portfolio_return"] = float(hist.loc[hist["condition"] == state, "portfolio_return"].mean())
+        q.loc[: k - 1, "cpi_yoy"] = float(data.condition_history.loc[data.condition_history["condition"] == state, "cpi_yoy"].mean())
         q.loc[: k - 1, "condition"] = m.regime_state
     transform = make_path_transform(data, m, portfolio_history)
     if transform is not None:
         q = transform(np.random.default_rng(0), q)
     annual = quarterly_to_annual(q, cfg.start_year)
-    overrides = build_year_overrides(scenario.endowment, cfg.horizon_years)
+    overrides = scenario_year_overrides(scenario, cfg.horizon_years)
     path = run_path(annual, cfg, inst, scenario_liquidity(liq, scenario), year_overrides=overrides)
     return add_derived_columns(path)
 
@@ -693,13 +761,28 @@ class LiquidityStress:
     capital_call_years: int = 3
     liquid_haircut: float = .5
     haircut_years: int = 2
-    reserve_years: float = 1.
-    forced_sale_discount: float = .3
+    reserve_years: float = 0.
+    forced_sale_discount: float = 0.
     allow_forced_sales: bool = True
 
 
+def r2_stress_defaults(inst, severity="Standard"):
+    from pathlib import Path
+    row = pd.read_csv(Path(__file__).parent / 'data/r2_stress.csv')
+    row = row[(row.institution_type == inst.institution_type) & (row.severity == severity)].iloc[0]
+    severe=severity=='Severe'
+    return InflationStress(regime_quarters=24 if severe else 16,inflation_add=.024 if severe else .016,
+        return_drag=-.04 if severe else -.02,drag_years=5 if severe else 3,
+        expense_growth=float(row.expense_growth),expense_years=int(row.expense_years)), LiquidityStress(
+        recovery_drag=-.04 if severe else -.03,recovery_years=3 if severe else 2,
+        gift_multiplier=float(row.gift_multiplier),gift_years=int(row.gift_years),
+        capital_call_rate=0.,capital_call_years=4 if severe else 3,
+        liquid_haircut=.25 if severe else 0.,haircut_years=2 if severe else 1)
+
+
 def framework_scenarios(inst, inflation=None, downturn=None):
-    a=inflation or InflationStress();b=downturn or LiquidityStress()
+    defaults=r2_stress_defaults(inst)
+    a=inflation or defaults[0];b=downturn or defaults[1]
     if not isinstance(a.regime_quarters,int) or a.regime_quarters<4:
         raise ValueError('Inflation window must include at least four replay quarters.')
     return [
@@ -714,6 +797,5 @@ def framework_scenarios(inst, inflation=None, downturn=None):
             EndowmentShock(gift_multiplier=b.gift_multiplier,gift_years=b.gift_years,
                 capital_call_rate=b.capital_call_rate,capital_call_years=b.capital_call_years,
                 liquid_haircut_add=b.liquid_haircut,liquid_haircut_years=b.haircut_years,
-                liquidity_overrides=dict(enabled=True,liquidity_buffer_years=b.reserve_years,
-                    forced_sale_discount=b.forced_sale_discount,allow_forced_sales=b.allow_forced_sales)))
+                liquidity_overrides={}))
     ]

@@ -7,7 +7,7 @@ import plotly.express as px
 import streamlit as st
 from dashboard_ui import style_figure,comparison_display
 from scenario_stress import (InflationStress,LiquidityStress,framework_scenarios,scenario_library,
-    StressScenario,MarketShock,EndowmentShock,run_stress_suite,reverse_stress_test,
+    r2_stress_defaults,StressScenario,MarketShock,EndowmentShock,run_stress_suite,reverse_stress_test,
     sensitivity_grid,asset_shock_table,EQUITY_CRASH_SHOCKS,market_portfolio_shock,replay_cumulative_return)
 
 
@@ -26,7 +26,7 @@ def show_results(bundle,prefix):
             'Real payouts ($M)':m['median_total_real_payout'],
             'Unpaid payout risk':f"{m['probability_at_least_one_shortfall']:.1%}",
             'Support-gap risk':f"{m['probability_any_support_gap']:.1%}",
-            'Mean sale loss ($M)':m['mean_forced_sale_loss']})
+            'Liquidity breach risk':f"{m['probability_liquidity_breach']:.1%}"})
     st.dataframe(pd.DataFrame(focus).style.format({'Ending real ($M)':'{:.2f}','Real payouts ($M)':'{:.2f}','Mean sale loss ($M)':'{:.2f}'}),hide_index=True,use_container_width=True)
     measure=st.selectbox('Compare over time',['Annual real payout','Real endowment value'],key=detail_key(prefix+'_chart'))
     col='real_actual_payout' if measure=='Annual real payout' else 'real_ending_assets'
@@ -43,7 +43,7 @@ def show_results(bundle,prefix):
         name=st.selectbox('Scenario details',list(detail),key=detail_key(prefix+'_details'))
         r=detail[name]
         columns=['actual_payout','real_actual_payout','real_ending_assets','operating_expenses',
-            'payout_support_gap','forced_sale_loss','capital_call_paid','unpaid_capital_call']
+            'payout_support_gap','minimum_liquid_share','minimum_liquidity_coverage','liquidity_breach','capital_call_paid','unpaid_capital_call']
         annual=r['annual_results'].groupby('year')[columns].median().reset_index()
         annual=annual.rename(columns={'year':'Year','actual_payout':'Payout ($M)','real_actual_payout':'Real payout ($M)',
             'real_ending_assets':'Real assets ($M)','operating_expenses':'Expenses ($M)',
@@ -59,12 +59,12 @@ def primary_stress_inputs(inst):
     """Read the same persisted assumptions on the home and detail screens."""
     def v(line,kind,default):
         return st.session_state.get('detail_input_stress_tab.py:'+str(line)+':'+kind,default)
-    p1=InflationStress(v(64,'slider',16),v(65,'slider',1.4)/100,
-        v(67,'slider',4.6)/100,v(68,'slider',2),v(66,'slider',0.)/100,v(69,'slider',0))
-    p2=LiquidityStress(v(72,'slider',-3.)/100,v(73,'slider',2),v(78,'slider',88.)/100,
-        v(79,'slider',2),v(74,'slider',2.)/100,v(75,'slider',3),v(76,'slider',50.)/100,
-        v(77,'slider',2),v(80,'slider',1.),v(81,'slider',30.)/100,
-        st.session_state.get('detail_input_stress_allow_sales',True))
+    a,b=r2_stress_defaults(inst,st.session_state.get("r2_severity","Standard"))
+    p1=InflationStress(v(64,'slider',a.regime_quarters),v(65,'slider',a.inflation_add*100)/100,
+        v(67,'slider',a.expense_growth*100)/100,v(68,'slider',a.expense_years),v(66,'slider',a.return_drag*100)/100,v(69,'slider',a.drag_years))
+    p2=LiquidityStress(v(72,'slider',b.recovery_drag*100)/100,v(73,'slider',b.recovery_years),v(78,'slider',b.gift_multiplier*100)/100,
+        v(79,'slider',b.gift_years),v(74,'slider',st.session_state.get('r1_calls_default',0.)*100)/100,v(75,'slider',b.capital_call_years),v(76,'slider',st.session_state.get('r1_haircut_default',b.liquid_haircut)*100)/100,
+        v(77,'slider',b.haircut_years),0.,0.,True)
     enabled=[v(60,'checkbox',True),v(61,'checkbox',True)]
     return [scenario for scenario,on in zip(framework_scenarios(inst,p1,p2),enabled) if on]
 
@@ -75,30 +75,37 @@ def primary_stress_signature(inst,n):
 
 def render_stress_panel(data,cfg,inst,liq,history,results,execute):
     st.subheader('Stress testing')
+    st.caption('Expense and gift stresses use final R2 benchmarks. Market stresses use R1 recommendations. Liquidity is monitored without liquidation costs.')
+    def reset_r2():
+        for line in [64,65,66,67,68,69,72,73,74,75,76,77,78,79]:
+            st.session_state.pop('detail_input_stress_tab.py:'+str(line)+':slider',None)
+    st.selectbox('Stress severity',['Standard','Severe'],key='r2_severity',on_change=reset_r2)
+    if st.session_state.get('r2_stress_cohort') != inst.institution_type:
+        reset_r2()
+        st.session_state['r2_stress_cohort']=inst.institution_type
+    r2a,r2b=r2_stress_defaults(inst,st.session_state['r2_severity'])
     left,right=st.columns(2)
     use_inflation=left.checkbox('High inflation & elevated rates',value=True,key=detail_key('stress_tab.py:60:checkbox'))
     use_downturn=right.checkbox('Prolonged downturn & liquidity squeeze',value=True,key=detail_key('stress_tab.py:61:checkbox'))
     with st.expander('Inflation and rates — settings'):
         a,b=st.columns(2)
-        q=a.slider('Inflation stress duration (quarters)',4,24,16,help='Includes the initial four-quarter 2022 replay.',key=detail_key('stress_tab.py:64:slider'))
-        cpi=a.slider('Extra inflation after replay (percentage points)',0.,5.,1.4,.1,key=detail_key('stress_tab.py:65:slider'))/100
-        drag=a.slider('Return drag after replay (%)',-10.,0.,0.,.5,key=detail_key('stress_tab.py:66:slider'))/100
-        growth=b.slider('Annual expense growth during stress (%)',0.,15.,4.6,.1,key=detail_key('stress_tab.py:67:slider'))/100
-        ey=b.slider('Expense stress duration (years)',0,10,2,key=detail_key('stress_tab.py:68:slider'))
-        dy=b.slider('Return drag duration (years)',0,10,0,key=detail_key('stress_tab.py:69:slider'))
+        q=a.slider('Inflation stress duration (quarters)',4,24,r2a.regime_quarters,help='Includes the initial four-quarter 2022 replay.',key=detail_key('stress_tab.py:64:slider'))
+        cpi=a.slider('Extra inflation after replay (percentage points)',0.,5.,r2a.inflation_add*100,.1,key=detail_key('stress_tab.py:65:slider'))/100
+        drag=a.slider('Return drag after replay (%)',-10.,0.,r2a.return_drag*100,.5,key=detail_key('stress_tab.py:66:slider'))/100
+        growth=b.slider('Annual expense growth during stress (%)',0.,20.,r2a.expense_growth*100,.01,key=detail_key('stress_tab.py:67:slider'))/100
+        ey=b.slider('Expense stress duration (years)',0,10,r2a.expense_years,key=detail_key('stress_tab.py:68:slider'))
+        dy=b.slider('Return drag duration (years)',0,10,r2a.drag_years,key=detail_key('stress_tab.py:69:slider'))
     with st.expander('Downturn and liquidity — settings'):
         a,b=st.columns(2)
-        rd=a.slider('Recovery return drag (%)',-10.,0.,-3.,.5,key=detail_key('stress_tab.py:72:slider'))/100
-        ry=a.slider('Recovery duration (years)',0,10,2,key=detail_key('stress_tab.py:73:slider'))
-        calls=a.slider('Annual capital calls (% of beginning assets)',0.,15.,2.,.5,help='Funded calls move cash into illiquid assets; this is a liquidity-pressure proxy, not an explicit delayed-distribution schedule.',key=detail_key('stress_tab.py:74:slider'))/100
-        cy=a.slider('Capital-call duration (years)',0,10,3,key=detail_key('stress_tab.py:75:slider'))
-        haircut=a.slider('Restricted liquid assets (%)',0.,100.,50.,5.,key=detail_key('stress_tab.py:76:slider'))/100
-        hy=a.slider('Liquidity restriction duration (years)',0,10,2,key=detail_key('stress_tab.py:77:slider'))
-        gifts=b.slider('Gifts as a share of normal (%)',0.,100.,88.,1.,key=detail_key('stress_tab.py:78:slider'))/100
-        gy=b.slider('Gift reduction duration (years)',0,10,2,key=detail_key('stress_tab.py:79:slider'))
-        reserve=b.slider('Cash reserve (years of payout)',0.,3.,1.,.25,key=detail_key('stress_tab.py:80:slider'))
-        discount=b.slider('Forced-sale discount (%)',0.,90.,30.,5.,key=detail_key('stress_tab.py:81:slider'))/100
-        sales=b.checkbox('Allow forced sales',value=True,key=detail_key('stress_allow_sales'))
+        rd=a.slider('Recovery return drag (%)',-10.,0.,r2b.recovery_drag*100,.5,key=detail_key('stress_tab.py:72:slider'))/100
+        ry=a.slider('Recovery duration (years)',0,10,r2b.recovery_years,key=detail_key('stress_tab.py:73:slider'))
+        calls=a.slider('Annual capital calls (% of beginning assets)',0.,15.,st.session_state.get('r1_calls_default',0.)*100,.1,help='Funded calls move cash into illiquid assets; this is a liquidity-pressure proxy, not an explicit delayed-distribution schedule.',key=detail_key('stress_tab.py:74:slider'))/100
+        cy=a.slider('Capital-call duration (years)',0,10,r2b.capital_call_years,key=detail_key('stress_tab.py:75:slider'))
+        haircut=a.slider('Restricted liquid assets (%)',0.,100.,st.session_state.get('r1_haircut_default',r2b.liquid_haircut)*100,1.,key=detail_key('stress_tab.py:76:slider'))/100
+        hy=a.slider('Liquidity restriction duration (years)',0,10,r2b.haircut_years,key=detail_key('stress_tab.py:77:slider'))
+        gifts=b.slider('Gifts as a share of normal (%)',0.,100.,r2b.gift_multiplier*100,1.,key=detail_key('stress_tab.py:78:slider'))/100
+        gy=b.slider('Gift reduction duration (years)',0,10,r2b.gift_years,key=detail_key('stress_tab.py:79:slider'))
+        b.caption('Restrictions reduce measured liquid resources, not payouts. Capital calls transfer liquid wealth into private assets; no liquidation costs.')
     selected=primary_stress_inputs(inst)
     n=cfg.n_sims
     scfg=cfg
@@ -115,7 +122,7 @@ def render_stress_panel(data,cfg,inst,liq,history,results,execute):
 
     st.divider()
     if not st.toggle('Additional scenarios and tools',value=False,key=detail_key('stress_tab.py:100:toggle')):return
-    library=scenario_library()
+    library=scenario_library(inst,st.session_state.get("r2_severity","Standard"),data)
     with st.expander('Scenario library'):
         rows=[]
         for name,sc in library.items():
@@ -125,16 +132,16 @@ def render_stress_panel(data,cfg,inst,liq,history,results,execute):
                 try:replay=replay_cumulative_return(data,sc.market.replay_quarters,history)
                 except (KeyError,ValueError):pass
             rows.append({'Scenario':name,'Type':sc.category,'Initial shock':f'{instant:.1%}' if instant else '—',
-                'Replay return':f'{replay:.1%}' if replay is not None else '—'})
+                'Historical strategy replay (reference)':f'{replay:.1%}' if replay is not None else '—'})
         st.dataframe(pd.DataFrame(rows),hide_index=True,use_container_width=True)
     with st.expander('Asset shock contributions'):
-        asset=asset_shock_table(data,EQUITY_CRASH_SHOCKS)
+        asset=asset_shock_table(data,library['Equity crash (asset-class shock)'].market.asset_shocks)
         st.dataframe(asset.style.format({'weight':'{:.1%}','shock':'{:.1%}','contribution':'{:.2%}'}),hide_index=True,use_container_width=True)
     with st.expander('Custom scenario'):
         a,b=st.columns(2)
         loss=a.slider('Initial portfolio loss (%)',0.,90.,20.,5.,key=detail_key('stress_tab.py:118:slider'))/100
         duration=a.slider('Custom duration (years)',1,10,3,key=detail_key('stress_tab.py:119:slider'))
-        cd=a.slider('Custom annual return drag (%)',-10.,0.,-3.,.5,key=detail_key('stress_tab.py:120:slider'))/100
+        cd=a.slider('Custom annual return drag (%)',-10.,0.,r2b.recovery_drag*100,.5,key=detail_key('stress_tab.py:120:slider'))/100
         ci=b.slider('Custom inflation increase (percentage points)',0.,10.,2.,.5,key=detail_key('stress_tab.py:121:slider'))/100
         spend=b.slider('Additional spending (percentage points)',0.,5.,0.,.25,key=detail_key('stress_tab.py:122:slider'))/100
         gift=b.slider('Custom gift reduction (%)',0.,100.,0.,5.,key=detail_key('stress_tab.py:123:slider'))/100
