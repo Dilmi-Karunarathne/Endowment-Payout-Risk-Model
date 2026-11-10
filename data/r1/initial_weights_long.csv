@@ -1,0 +1,118 @@
+Strategy_No,Strategy_ID,Strategy_Name,Decision_Date,Effective_From,Regime_At_Decision,Asset_ID,Asset_Name,Category,Liquidity_Class,R3_App_Class,Weight
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,us_large_cap,U.S. Large Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.0875
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,us_small_cap,U.S. Small Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.0875
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,developed_ex_us,Developed Non-U.S.,Equities,Within 1 Month (stressed),Developed ex-US Equity,0.0875
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,emerging_markets,Emerging Markets,Equities,Within 1 Month (stressed),Emerging Markets Equity,0.0875
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,inflation_linked_bonds,Inflation-Linked Bonds,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.035
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,investment_grade_corporate_bonds,Investment Grade,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.035
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,high_yield_fixed_income,High Yield,Fixed Income,Within 1 Month (stressed),High Yield Bonds,0.035
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,treasuries,Treasuries,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.035
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,private_equity,Private Equity,Alternatives,Longer than 12 Months (stressed),Private Equity,0.15
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,hedge_funds,Hedge Funds,Alternatives,3 to 12 Months (stressed),Hedge Funds,0.15
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,venture_capital,Venture Capital,Alternatives,Longer than 12 Months (stressed),Venture Capital,0.15
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,cash_tbill,Cash (T-Bills),Cash,Within 1 Month (stressed),Cash / T-Bills,0.035
+1,EqualBucket,Policy-midpoint fixed mix,2000-12-31,2001-01-31,High Inflation,commodities,Commodities,Commodities,Within 1 Month (stressed),(no R3 class),0.025
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,us_large_cap,U.S. Large Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.1746255729
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,us_small_cap,U.S. Small Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.0722328845
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,developed_ex_us,Developed Non-U.S.,Equities,Within 1 Month (stressed),Developed ex-US Equity,0.1507600855
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,emerging_markets,Emerging Markets,Equities,Within 1 Month (stressed),Emerging Markets Equity,0.0023816999
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,inflation_linked_bonds,Inflation-Linked Bonds,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0780147951
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,investment_grade_corporate_bonds,Investment Grade,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0335897214
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,high_yield_fixed_income,High Yield,Fixed Income,Within 1 Month (stressed),High Yield Bonds,9.5462e-06
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,treasuries,Treasuries,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0883857853
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,private_equity,Private Equity,Alternatives,Longer than 12 Months (stressed),Private Equity,0.0428086925
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,hedge_funds,Hedge Funds,Alternatives,3 to 12 Months (stressed),Hedge Funds,0.2499998843
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,venture_capital,Venture Capital,Alternatives,Longer than 12 Months (stressed),Venture Capital,0.0071916339
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,cash_tbill,Cash (T-Bills),Cash,Within 1 Month (stressed),Cash / T-Bills,0.0499998717
+2,MinVar,Minimum-Variance,2000-12-31,2001-01-31,High Inflation,commodities,Commodities,Commodities,Within 1 Month (stressed),(no R3 class),0.0499998267
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,us_large_cap,U.S. Large Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.2267196898
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,us_small_cap,U.S. Small Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.0456966578
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,developed_ex_us,Developed Non-U.S.,Equities,Within 1 Month (stressed),Developed ex-US Equity,0.0295252812
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,emerging_markets,Emerging Markets,Equities,Within 1 Month (stressed),Emerging Markets Equity,9.3e-09
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,inflation_linked_bonds,Inflation-Linked Bonds,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0675665247
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,investment_grade_corporate_bonds,Investment Grade,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0514998021
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,high_yield_fixed_income,High Yield,Fixed Income,Within 1 Month (stressed),High Yield Bonds,9.3e-09
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,treasuries,Treasuries,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0809336151
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,private_equity,Private Equity,Alternatives,Longer than 12 Months (stressed),Private Equity,0.1475557516
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,hedge_funds,Hedge Funds,Alternatives,3 to 12 Months (stressed),Hedge Funds,0.0342040935
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,venture_capital,Venture Capital,Alternatives,Longer than 12 Months (stressed),Venture Capital,0.2162985646
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,cash_tbill,Cash (T-Bills),Cash,Within 1 Month (stressed),Cash / T-Bills,0.0500000038
+3,MaxSharpe,Maximum-Sharpe,2000-12-31,2001-01-31,High Inflation,commodities,Commodities,Commodities,Within 1 Month (stressed),(no R3 class),0.049999997
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,us_large_cap,U.S. Large Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.0877155395
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,us_small_cap,U.S. Small Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.0714190823
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,developed_ex_us,Developed Non-U.S.,Equities,Within 1 Month (stressed),Developed ex-US Equity,0.1237702676
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,emerging_markets,Emerging Markets,Equities,Within 1 Month (stressed),Emerging Markets Equity,0.0690554359
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,inflation_linked_bonds,Inflation-Linked Bonds,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.1272450831
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,investment_grade_corporate_bonds,Investment Grade,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0083466729
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,high_yield_fixed_income,High Yield,Fixed Income,Within 1 Month (stressed),High Yield Bonds,0.0
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,treasuries,Treasuries,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0644082436
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,private_equity,Private Equity,Alternatives,Longer than 12 Months (stressed),Private Equity,0.0528830256
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,hedge_funds,Hedge Funds,Alternatives,3 to 12 Months (stressed),Hedge Funds,0.2499999999
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,venture_capital,Venture Capital,Alternatives,Longer than 12 Months (stressed),Venture Capital,0.0451566496
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,cash_tbill,Cash (T-Bills),Cash,Within 1 Month (stressed),Cash / T-Bills,0.05
+4,MaxDiv,Maximum-Diversification,2000-12-31,2001-01-31,High Inflation,commodities,Commodities,Commodities,Within 1 Month (stressed),(no R3 class),0.05
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,us_large_cap,U.S. Large Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.107322143
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,us_small_cap,U.S. Small Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.0828853937
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,developed_ex_us,Developed Non-U.S.,Equities,Within 1 Month (stressed),Developed ex-US Equity,0.1037567215
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,emerging_markets,Emerging Markets,Equities,Within 1 Month (stressed),Emerging Markets Equity,0.0586745893
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,inflation_linked_bonds,Inflation-Linked Bonds,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,investment_grade_corporate_bonds,Investment Grade,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0926921388
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,high_yield_fixed_income,High Yield,Fixed Income,Within 1 Month (stressed),High Yield Bonds,0.1073078613
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,treasuries,Treasuries,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,private_equity,Private Equity,Alternatives,Longer than 12 Months (stressed),Private Equity,0.0544258357
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,hedge_funds,Hedge Funds,Alternatives,3 to 12 Months (stressed),Hedge Funds,0.25
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,venture_capital,Venture Capital,Alternatives,Longer than 12 Months (stressed),Venture Capital,0.0429353167
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,cash_tbill,Cash (T-Bills),Cash,Within 1 Month (stressed),Cash / T-Bills,0.05
+5,ERC,Equal Risk Contribution,2000-12-31,2001-01-31,High Inflation,commodities,Commodities,Commodities,Within 1 Month (stressed),(no R3 class),0.05
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,us_large_cap,U.S. Large Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.0996933073
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,us_small_cap,U.S. Small Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.0994109912
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,developed_ex_us,Developed Non-U.S.,Equities,Within 1 Month (stressed),Developed ex-US Equity,0.1003592758
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,emerging_markets,Emerging Markets,Equities,Within 1 Month (stressed),Emerging Markets Equity,0.0992208419
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,inflation_linked_bonds,Inflation-Linked Bonds,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0514074891
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,investment_grade_corporate_bonds,Investment Grade,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0489223508
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,high_yield_fixed_income,High Yield,Fixed Income,Within 1 Month (stressed),High Yield Bonds,0.0494026336
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,treasuries,Treasuries,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0502675256
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,private_equity,Private Equity,Alternatives,Longer than 12 Months (stressed),Private Equity,0.099089116
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,hedge_funds,Hedge Funds,Alternatives,3 to 12 Months (stressed),Hedge Funds,0.1031592794
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,venture_capital,Venture Capital,Alternatives,Longer than 12 Months (stressed),Venture Capital,0.0990671902
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,cash_tbill,Cash (T-Bills),Cash,Within 1 Month (stressed),Cash / T-Bills,0.0499999999
+6,HRP,Hierarchical Risk Parity,2000-12-31,2001-01-31,High Inflation,commodities,Commodities,Commodities,Within 1 Month (stressed),(no R3 class),0.049999999
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,us_large_cap,U.S. Large Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.1762837581
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,us_small_cap,U.S. Small Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.1314744675
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,developed_ex_us,Developed Non-U.S.,Equities,Within 1 Month (stressed),Developed ex-US Equity,0.0761532879
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,emerging_markets,Emerging Markets,Equities,Within 1 Month (stressed),Emerging Markets Equity,9e-10
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,inflation_linked_bonds,Inflation-Linked Bonds,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0383496615
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,investment_grade_corporate_bonds,Investment Grade,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0429122133
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,high_yield_fixed_income,High Yield,Fixed Income,Within 1 Month (stressed),High Yield Bonds,0.0382653668
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,treasuries,Treasuries,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0416989871
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,private_equity,Private Equity,Alternatives,Longer than 12 Months (stressed),Private Equity,0.1300000009
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,hedge_funds,Hedge Funds,Alternatives,3 to 12 Months (stressed),Hedge Funds,0.006500416
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,venture_capital,Venture Capital,Alternatives,Longer than 12 Months (stressed),Venture Capital,0.2499999981
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,cash_tbill,Cash (T-Bills),Cash,Within 1 Month (stressed),Cash / T-Bills,0.020000007
+7,MeanCVaR,Mean-CVaR,2000-12-31,2001-01-31,High Inflation,commodities,Commodities,Commodities,Within 1 Month (stressed),(no R3 class),0.0483618349
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,us_large_cap,U.S. Large Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.1256400996
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,us_small_cap,U.S. Small Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.0659283795
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,developed_ex_us,Developed Non-U.S.,Equities,Within 1 Month (stressed),Developed ex-US Equity,0.1976243186
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,emerging_markets,Emerging Markets,Equities,Within 1 Month (stressed),Emerging Markets Equity,0.0
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,inflation_linked_bonds,Inflation-Linked Bonds,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0667402146
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,investment_grade_corporate_bonds,Investment Grade,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0478366238
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,high_yield_fixed_income,High Yield,Fixed Income,Within 1 Month (stressed),High Yield Bonds,0.0
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,treasuries,Treasuries,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0854231616
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,private_equity,Private Equity,Alternatives,Longer than 12 Months (stressed),Private Equity,0.0185437443
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,hedge_funds,Hedge Funds,Alternatives,3 to 12 Months (stressed),Hedge Funds,0.25
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,venture_capital,Venture Capital,Alternatives,Longer than 12 Months (stressed),Venture Capital,0.042263458
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,cash_tbill,Cash (T-Bills),Cash,Within 1 Month (stressed),Cash / T-Bills,0.05
+8,MinCDaR,Minimum Drawdown (CDaR),2000-12-31,2001-01-31,High Inflation,commodities,Commodities,Commodities,Within 1 Month (stressed),(no R3 class),0.05
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,us_large_cap,U.S. Large Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.2128910547
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,us_small_cap,U.S. Small Cap,Equities,Within 1 Month (stressed),US Large Cap Equity,0.0631954196
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,developed_ex_us,Developed Non-U.S.,Equities,Within 1 Month (stressed),Developed ex-US Equity,0.0409355925
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,emerging_markets,Emerging Markets,Equities,Within 1 Month (stressed),Emerging Markets Equity,1e-09
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,inflation_linked_bonds,Inflation-Linked Bonds,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0667305323
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,investment_grade_corporate_bonds,Investment Grade,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0462685761
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,high_yield_fixed_income,High Yield,Fixed Income,Within 1 Month (stressed),High Yield Bonds,1e-09
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,treasuries,Treasuries,Fixed Income,Within 1 Month (stressed),Investment Grade Bonds,0.0870008837
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,private_equity,Private Equity,Alternatives,Longer than 12 Months (stressed),Private Equity,0.1742930073
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,hedge_funds,Hedge Funds,Alternatives,3 to 12 Months (stressed),Hedge Funds,0.0029780208
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,venture_capital,Venture Capital,Alternatives,Longer than 12 Months (stressed),Venture Capital,0.20570692
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,cash_tbill,Cash (T-Bills),Cash,Within 1 Month (stressed),Cash / T-Bills,0.0499999943
+9,BlackLitterman,Black-Litterman,2000-12-31,2001-01-31,High Inflation,commodities,Commodities,Commodities,Within 1 Month (stressed),(no R3 class),0.0499999965
