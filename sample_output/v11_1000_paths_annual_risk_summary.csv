@@ -1,0 +1,6 @@
+year,payout_shortfall_amount_mean,payout_shortfall_amount_median,return_coverage_shortfall_amount_mean,return_coverage_shortfall_amount_median,earnings_gifts_coverage_gap_mean,earnings_gifts_coverage_gap_median,payout_liquidity_coverage_ratio_mean,payout_liquidity_coverage_ratio_median,payout_support_gap_mean,payout_support_gap_median,forced_sale_loss_mean,forced_sale_loss_median,planned_payout_mean,planned_payout_median,actual_payout_mean,actual_payout_median,real_ending_assets_mean,real_ending_assets_median
+2027,0.0,0.0,4.951316,0.0,4.26498,0.0,17.228582,17.886103,0.026076,0.026076,0.0,0.0,7.345887,7.345887,7.345887,7.345887,154.79863,156.925847
+2028,0.0,0.0,5.619287,0.0,4.85208,0.0,17.436208,17.860759,0.269651,0.038367,1e-06,0.0,7.381624,7.538902,7.381624,7.538902,159.339502,161.546096
+2029,0.0,0.0,4.948985,0.0,4.221842,0.0,17.354142,17.629842,0.408252,0.0,2e-06,0.0,7.662335,7.815018,7.662335,7.815018,165.765967,165.433897
+2030,0.0,0.0,5.942673,0.0,5.118605,0.0,16.776332,17.040108,0.494781,0.0,2.6e-05,0.0,8.149677,8.235657,8.149677,8.235657,172.454652,170.224932
+2031,0.0,0.0,6.691582,0.0,5.78322,0.0,16.28619,16.591358,0.561834,0.0,2.5e-05,0.0,8.652337,8.63258,8.652337,8.63258,179.094646,174.924627

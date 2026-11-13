@@ -1,0 +1,17 @@
+R3_Asset_Class,Data_Asset_ID,DataTeam_Stressed_Liquidation_Cost,DataTeam_Stressed_Time_to_Cash,In_R1_Strategies,Base_Shock_GFC_Joint_Window,Severe_Shock_Scaled_to_Fed_2026,2022_Replay_Return,R3_Current_Equity_Crash_Input,Note
+Cash / T-Bills,cash_tbill,Less than 2%,Within 1 Month,True,0.0246450575944277,0.0246450575944277,0.015191740412979993,not stated,
+Developed ex-US Equity,developed_ex_us,Less than 2%,Within 1 Month,True,-0.5667827018090952,-0.6452248248011275,-0.14451720716757965,-35% to -45% (public equity),
+Emerging Markets Equity,emerging_markets,0.75% – 2.50%,Within 1 Month,True,-0.6159451522258135,-0.7011913060569466,-0.2009137449734154,-35% to -45% (public equity),
+Global Equity,global_equity,Less than 2%,Within 1 Month,False,-0.5492335360420435,-0.6252468731605608,-0.18364008043291669,-35% to -45% (public equity),Not held by any R1 strategy (no weight).
+Hedge Funds,hedge_funds,3.0% – 15.0%,3 to 12 Months,True,-0.24718214021221097,-0.2813918854674408,-0.010582250885639022,-12%,De-smoothed GFC drawdown -24.7% used instead of the smoothed value.
+High Yield Bonds,high_yield_fixed_income,1.50% – 5.00%,Within 1 Month,True,-0.25586437575585796,-0.2912757331742444,-0.11188617998480543,not stated,
+Investment Grade Bonds,investment_grade_corporate_bonds,Less than 2%,Within 1 Month,True,-0.05675513028825874,-0.06460997994455601,-0.1576157136086409,+4%,
+Private Debt,private_debt,20.0% – 40.0%,Longer than 12 Months,False,-0.07726761370385637,-0.08796136924387679,0.06298528703878148,not stated,Own reported 2007Q4–2009Q4 drawdown used because appraisal-based values fall with a lag. Quarterly appraisal/NAV-based index (reported value); true losses were larger because the index is smoothed (quarterly AR(1) = 0.23). Not held by any R1 strategy (supplied because the R3 app has this class).
+Private Equity,private_equity,25.0% – 50.0%,Longer than 12 Months,True,-0.4547413178095473,-0.51767703244466,-0.3106970667255523,-22%,
+Private Real Estate,private_real_estate,15.0% – 35.0%,Longer than 12 Months,False,-0.3784319694271986,-0.4308065514233935,0.07456602753576491,not stated,Own reported 2007Q4–2009Q4 drawdown used because appraisal-based values fall with a lag. Quarterly appraisal/NAV-based index (reported value); true losses were larger because the index is smoothed (quarterly AR(1) = 0.86). Not held by any R1 strategy (supplied because the R3 app has this class).
+US Large Cap Equity,us_large_cap,Less than 2%,Within 1 Month,True,-0.5094874753937098,-0.58,-0.18110861067391804,-35% to -45% (public equity),
+Venture Capital,venture_capital,35.0% – 65.0%,Longer than 12 Months,True,-0.38792254433707174,-0.44161061180480476,-0.5488461811975531,-30%,
+US Small Cap Equity (add),us_small_cap,Less than 2%,Within 1 Month,True,-0.5204488643923362,-0.5924784335754091,-0.20436437600883883,not stated,
+Treasuries (add),treasuries,Less than 2%,Within 1 Month,True,0.1330127684460185,0.1330127684460185,-0.12462649252985047,not stated,
+Inflation-Linked Bonds (add),inflation_linked_bonds,Less than 2%,Within 1 Month,True,0.010478523706304754,0.010478523706304754,-0.11845701097446748,not stated,
+Commodities (add),commodities,Less than 2%,Within 1 Month,True,-0.41021589725789553,-0.46698934105440204,0.1609318646121194,not stated,Commodities rose until mid-2008 and then fell; they did not hedge the 2008 crash. Max 5% of any strategy.

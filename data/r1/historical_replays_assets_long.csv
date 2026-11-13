@@ -1,0 +1,145 @@
+Window,Start_Month,End_Month,Use,Asset_ID,Asset_Name,In_R1_Universe,R3_App_Class,Cumulative_Return,Months_With_Data,Months_In_Window,Backfilled_Months,Data_Note
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,us_large_cap,U.S. Large Cap,True,US Large Cap Equity,-0.3500493445585686,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,us_small_cap,U.S. Small Cap,True,US Large Cap Equity,-0.3203917272191812,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,developed_ex_us,Developed Non-U.S.,True,Developed ex-US Equity,-0.3887642910002558,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,emerging_markets,Emerging Markets,True,Emerging Markets Equity,-0.36527079084522984,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,inflation_linked_bonds,Inflation-Linked Bonds,True,Investment Grade Bonds,0.03711057794833983,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,investment_grade_corporate_bonds,Investment Grade,True,Investment Grade Bonds,0.029684224357787947,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,high_yield_fixed_income,High Yield,True,High Yield Bonds,-0.0368112465853806,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,treasuries,Treasuries,True,Investment Grade Bonds,0.08842483227818199,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,private_equity,Private Equity,True,Private Equity,-0.20703746451632887,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,hedge_funds,Hedge Funds,True,Hedge Funds,-0.10237988325100966,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,venture_capital,Venture Capital,True,Venture Capital,-0.26167503502116884,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,cash_tbill,Cash (T-Bills),True,Cash / T-Bills,0.018521475331310544,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,commodities,Commodities,True,(no R3 class),-0.3267705964546965,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,global_equity,Global Equity,False,Global Equity,-0.36893755639891623,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,private_debt,Private Debt,False,Private Debt,-0.016200753391678258,18,18,0,Complete
+GFC replay (R3 window: 2008Q1–2009Q2),2008-01,2009-06,R3 Test 2 / GFC replay window,private_real_estate,Private Real Estate,False,Private Real Estate,-0.29343020267664943,18,18,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,us_large_cap,U.S. Large Cap,True,US Large Cap Equity,-0.5094874753937098,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,us_small_cap,U.S. Small Cap,True,US Large Cap Equity,-0.5204488643923362,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,developed_ex_us,Developed Non-U.S.,True,Developed ex-US Equity,-0.5667827018090952,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,emerging_markets,Emerging Markets,True,Emerging Markets Equity,-0.6159451522258135,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,inflation_linked_bonds,Inflation-Linked Bonds,True,Investment Grade Bonds,0.010478523706304754,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,investment_grade_corporate_bonds,Investment Grade,True,Investment Grade Bonds,-0.05675513028825874,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,high_yield_fixed_income,High Yield,True,High Yield Bonds,-0.25586437575585796,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,treasuries,Treasuries,True,Investment Grade Bonds,0.1330127684460185,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,private_equity,Private Equity,True,Private Equity,-0.4547413178095473,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,hedge_funds,Hedge Funds,True,Hedge Funds,-0.21605813541297392,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,venture_capital,Venture Capital,True,Venture Capital,-0.38792254433707174,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,cash_tbill,Cash (T-Bills),True,Cash / T-Bills,0.0246450575944277,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,commodities,Commodities,True,(no R3 class),-0.41021589725789553,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,global_equity,Global Equity,False,Global Equity,-0.5492335360420435,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,private_debt,Private Debt,False,Private Debt,-0.04422346468129423,16,16,0,Complete
+GFC peak to trough (Nov 2007–Feb 2009),2007-11,2009-02,Joint worst-case window for an instantaneous crash shock,private_real_estate,Private Real Estate,False,Private Real Estate,-0.1683007893730184,16,16,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,us_large_cap,U.S. Large Cap,True,US Large Cap Equity,0.49550181228430534,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,us_small_cap,U.S. Small Cap,True,US Large Cap Equity,0.669283135451656,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,developed_ex_us,Developed Non-U.S.,True,Developed ex-US Equity,0.38075649258921196,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,emerging_markets,Emerging Markets,True,Emerging Markets Equity,0.5738470436192,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,inflation_linked_bonds,Inflation-Linked Bonds,True,Investment Grade Bonds,0.17996305213641595,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,investment_grade_corporate_bonds,Investment Grade,True,Investment Grade Bonds,0.2320489097964602,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,high_yield_fixed_income,High Yield,True,High Yield Bonds,0.46579969794440834,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,treasuries,Treasuries,True,Investment Grade Bonds,0.09055341412878737,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,private_equity,Private Equity,True,Private Equity,0.7446695515342237,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,hedge_funds,Hedge Funds,True,Hedge Funds,0.313356678339169,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,venture_capital,Venture Capital,True,Venture Capital,0.6534812825104432,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,cash_tbill,Cash (T-Bills),True,Cash / T-Bills,0.002612739718869328,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,commodities,Commodities,True,(no R3 class),0.293647292468725,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,global_equity,Global Equity,False,Global Equity,0.45446598259324666,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,private_debt,Private Debt,False,Private Debt,0.3249748092701883,24,24,0,Complete
+Two years after the GFC replay (2009Q3–2011Q2),2009-07,2011-06,Evidence for the post-replay recovery drag,private_real_estate,Private Real Estate,False,Private Real Estate,0.1327630465156202,24,24,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,us_large_cap,U.S. Large Cap,True,US Large Cap Equity,-0.18110861067391804,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,us_small_cap,U.S. Small Cap,True,US Large Cap Equity,-0.20436437600883883,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,developed_ex_us,Developed Non-U.S.,True,Developed ex-US Equity,-0.14451720716757965,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,emerging_markets,Emerging Markets,True,Emerging Markets Equity,-0.2009137449734154,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,inflation_linked_bonds,Inflation-Linked Bonds,True,Investment Grade Bonds,-0.11845701097446748,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,investment_grade_corporate_bonds,Investment Grade,True,Investment Grade Bonds,-0.1576157136086409,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,high_yield_fixed_income,High Yield,True,High Yield Bonds,-0.11188617998480543,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,treasuries,Treasuries,True,Investment Grade Bonds,-0.12462649252985047,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,private_equity,Private Equity,True,Private Equity,-0.3106970667255523,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,hedge_funds,Hedge Funds,True,Hedge Funds,-0.010582250885639022,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,venture_capital,Venture Capital,True,Venture Capital,-0.5488461811975531,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,cash_tbill,Cash (T-Bills),True,Cash / T-Bills,0.015191740412979993,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,commodities,Commodities,True,(no R3 class),0.1609318646121194,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,global_equity,Global Equity,False,Global Equity,-0.18364008043291669,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,private_debt,Private Debt,False,Private Debt,0.06298528703878148,12,12,0,Complete
+2022 inflation & rates replay (2022Q1–Q4),2022-01,2022-12,R3 Test 1 / 2022 replay window,private_real_estate,Private Real Estate,False,Private Real Estate,0.07456602753576491,12,12,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,us_large_cap,U.S. Large Cap,True,US Large Cap Equity,0.5788443194264248,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,us_small_cap,U.S. Small Cap,True,US Large Cap Equity,0.304200235749587,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,developed_ex_us,Developed Non-U.S.,True,Developed ex-US Equity,0.22758365605379116,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,emerging_markets,Emerging Markets,True,Emerging Markets Equity,0.1806969141479302,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,inflation_linked_bonds,Inflation-Linked Bonds,True,Investment Grade Bonds,0.0580307325386622,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,investment_grade_corporate_bonds,Investment Grade,True,Investment Grade Bonds,0.10824742268041243,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,high_yield_fixed_income,High Yield,True,High Yield Bonds,0.22740310059788715,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,treasuries,Treasuries,True,Investment Grade Bonds,0.046541064435498214,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,private_equity,Private Equity,True,Private Equity,0.37121477063705854,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,hedge_funds,Hedge Funds,True,Hedge Funds,0.14386045444112927,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,venture_capital,Venture Capital,True,Venture Capital,1.0117983173408462,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,cash_tbill,Cash (T-Bills),True,Cash / T-Bills,0.10731754564385687,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,commodities,Commodities,True,(no R3 class),-0.029575516126775003,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,global_equity,Global Equity,False,Global Equity,0.4357335709484089,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,private_debt,Private Debt,False,Private Debt,0.21202073688639156,24,24,0,Complete
+Two years after the 2022 replay (2023Q1–2024Q4),2023-01,2024-12,Evidence for the post-replay return drag,private_real_estate,Private Real Estate,False,Private Real Estate,-0.13284074328791318,24,24,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,us_large_cap,U.S. Large Cap,True,US Large Cap Equity,-0.030807946021473187,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,us_small_cap,U.S. Small Cap,True,US Large Cap Equity,-0.1297798762262995,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,developed_ex_us,Developed Non-U.S.,True,Developed ex-US Equity,-0.11343927448347757,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,emerging_markets,Emerging Markets,True,Emerging Markets Equity,-0.09784382671001068,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,inflation_linked_bonds,Inflation-Linked Bonds,True,Investment Grade Bonds,0.06005872035745119,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,investment_grade_corporate_bonds,Investment Grade,True,Investment Grade Bonds,0.050242261518995246,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,high_yield_fixed_income,High Yield,True,High Yield Bonds,-0.03798384621375561,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,treasuries,Treasuries,True,Investment Grade Bonds,0.08714733013191078,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,private_equity,Private Equity,True,Private Equity,-0.11232021025723982,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,hedge_funds,Hedge Funds,True,Hedge Funds,-0.05334444675974126,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,venture_capital,Venture Capital,True,Venture Capital,0.2589080554850902,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,cash_tbill,Cash (T-Bills),True,Cash / T-Bills,0.004846207101176558,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,commodities,Commodities,True,(no R3 class),-0.19398363528332396,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,global_equity,Global Equity,False,Global Equity,-0.06252459579653258,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,private_debt,Private Debt,False,Private Debt,-0.017455160997224106,6,6,0,Complete
+COVID replay (R3 window: 2020Q1–Q2),2020-01,2020-06,R3 COVID replay window,private_real_estate,Private Real Estate,False,Private Real Estate,-0.005952880000000049,6,6,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,us_large_cap,U.S. Large Cap,True,US Large Cap Equity,-0.1956645085734251,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,us_small_cap,U.S. Small Cap,True,US Large Cap Equity,-0.2831575931512743,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,developed_ex_us,Developed Non-U.S.,True,Developed ex-US Equity,-0.21180084619272943,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,emerging_markets,Emerging Markets,True,Emerging Markets Equity,-0.1986329014261482,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,inflation_linked_bonds,Inflation-Linked Bonds,True,Investment Grade Bonds,-0.003983742873003737,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,investment_grade_corporate_bonds,Investment Grade,True,Investment Grade Bonds,-0.0584237204828284,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,high_yield_fixed_income,High Yield,True,High Yield Bonds,-0.1270799459546107,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,treasuries,Treasuries,True,Investment Grade Bonds,0.056197455194032075,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,private_equity,Private Equity,True,Private Equity,-0.3284719080792533,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,hedge_funds,Hedge Funds,True,Hedge Funds,-0.11329563728795955,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,venture_capital,Venture Capital,True,Venture Capital,-0.18666345264398698,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,cash_tbill,Cash (T-Bills),True,Cash / T-Bills,0.0034079122833010622,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,commodities,Commodities,True,(no R3 class),-0.17203754500310897,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,global_equity,Global Equity,False,Global Equity,-0.20486898093095895,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,private_debt,Private Debt,False,Private Debt,-0.03244536540295262,2,2,0,Complete
+COVID crash (Feb–Mar 2020),2020-02,2020-03,Fast crash inside the COVID window,private_real_estate,Private Real Estate,False,Private Real Estate,0.006440038640231682,2,2,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,us_large_cap,U.S. Large Cap,True,US Large Cap Equity,-0.4473359082165633,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,us_small_cap,U.S. Small Cap,True,US Large Cap Equity,-0.30636921712004195,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,developed_ex_us,Developed Non-U.S.,True,Developed ex-US Equity,-0.42571659076256607,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,emerging_markets,Emerging Markets,True,Emerging Markets Equity,-0.3433343350151029,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,inflation_linked_bonds,Inflation-Linked Bonds,True,Investment Grade Bonds,0.30517457575639395,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,investment_grade_corporate_bonds,Investment Grade,True,Investment Grade Bonds,0.2194950244496452,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,high_yield_fixed_income,High Yield,True,High Yield Bonds,-0.08657112237298525,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,treasuries,Treasuries,True,Investment Grade Bonds,0.24843988485094437,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,private_equity,Private Equity,True,Private Equity,-0.14857015192135825,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,hedge_funds,Hedge Funds,True,Hedge Funds,-0.12255509267873854,25,25,25,Complete; includes backfilled months
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,venture_capital,Venture Capital,True,Venture Capital,-0.720371479558126,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,cash_tbill,Cash (T-Bills),True,Cash / T-Bills,0.0770203701238188,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,commodities,Commodities,True,(no R3 class),0.052550023974085036,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,global_equity,Global Equity,False,Global Equity,-0.44648619086682984,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,private_debt,Private Debt,False,Private Debt,0.11453872336322535,25,25,0,Complete
+Dot-com bear market (Sep 2000–Sep 2002),2000-09,2002-09,Prolonged (25-month) equity decline,private_real_estate,Private Real Estate,False,Private Real Estate,0.14327682703614952,25,25,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,us_large_cap,U.S. Large Cap,True,US Large Cap Equity,-0.034431226905002,10,10,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,us_small_cap,U.S. Small Cap,True,US Large Cap Equity,-0.07298916023450985,10,10,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,developed_ex_us,Developed Non-U.S.,True,Developed ex-US Equity,-0.012421755505126697,10,10,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,emerging_markets,Emerging Markets,True,Emerging Markets Equity,-0.023465967060195436,10,10,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,inflation_linked_bonds,Inflation-Linked Bonds,True,Investment Grade Bonds,0.026516214029739915,10,10,10,Complete; includes backfilled months
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,investment_grade_corporate_bonds,Investment Grade,True,Investment Grade Bonds,-0.06534257680373445,10,10,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,high_yield_fixed_income,High Yield,True,High Yield Bonds,-0.03839590443686025,10,10,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,treasuries,Treasuries,True,Investment Grade Bonds,-0.05275190276042252,10,10,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,private_equity,Private Equity,True,Private Equity,-0.09336656109796959,10,10,10,Complete; includes backfilled months
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,hedge_funds,Hedge Funds,True,Hedge Funds,-0.07393086164305218,10,10,10,Complete; includes backfilled months
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,venture_capital,Venture Capital,True,Venture Capital,0.10447989579598826,10,10,10,Complete; includes backfilled months
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,cash_tbill,Cash (T-Bills),True,Cash / T-Bills,0.033419977720014815,10,10,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,commodities,Commodities,True,(no R3 class),0.09360352633783431,10,10,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,global_equity,Global Equity,False,Global Equity,-0.018481305991585817,10,10,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,private_debt,Private Debt,False,Private Debt,0.06137296689811245,10,10,0,Complete
+1994 bond-market rout (Feb–Nov 1994),1994-02,1994-11,Rate shock with weak equities,private_real_estate,Private Real Estate,False,Private Real Estate,0.05132715478825123,10,10,0,Complete

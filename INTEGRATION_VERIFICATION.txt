@@ -1,0 +1,43 @@
+Endowment Payout Risk — v11 Cash-First Integration Verification
+Date: November 12, 2026
+
+Static check:
+  python -m py_compile *.py                  PASS
+
+Unit and integration tests:
+  python -m pytest -q test_cash_first_update.py test_model_validation.py
+  56 passed
+
+Additional integration smoke checks (all completed):
+  - All 6 R2 institution/profile combinations (Private/Public x Low/Base/High)
+  - All 9 R1 investment strategies
+  - 54-combination Excel batch export (2 paths per combination), valid ZIP/XLSX package
+  - Primary stress suite: Baseline; High inflation and elevated rates;
+    Prolonged downturn and liquidity squeeze
+  - Accounting identity and no fictitious sale of PE/VC under 3-month payout deadline
+
+Updated R1 HRP / R2 Private Base development baseline:
+  Horizon 2027-2031 | paths 1,000 | seed 42 | annual 3-month sale deadline
+  P(any payout funding shortfall)         0.00%
+  P(any real principal erosion)          58.90%
+  P(any R2 institutional support gap)   100.00%
+  Terminal purchasing-power ES (95%)    39.39% of starting endowment
+  Annual E+G gap, mean per simulated year $4.848M
+  Median terminal real endowment         $174.925M
+  Median minimum funding coverage        14.55x
+  Max annual accounting residual         1.14e-13 M
+
+Demonstration of liquidity responsiveness (illustrative / NOT calibrated):
+  100 paths, same HRP Private/Base, 5 years, seed 42:
+  restricted eligible holdings 98%, annual other endowment cash need $3M,
+  protected cash reserve of 0.5 years' payout -> 99% of paths have >=1
+  payout shortfall, compared with 0% in the unrestricted baseline.
+
+IMPORTANT: The original v10 return and risk figures MUST NOT be copied into
+reports for v11. The executor and private-asset trade constraints have changed.
+R1 return simulation still uses the same joint historical bootstrap inputs.
+R2 Low/High are marginal parameter percentiles, not coherent adverse profiles.
+No monthly cash timeline, donor-restriction details, or management-fee schedule.
+
+The project should still validate asset sale timing, funding priorities,
+benchmark support materiality, fees, and worst-month coverage with Research 1/2.
