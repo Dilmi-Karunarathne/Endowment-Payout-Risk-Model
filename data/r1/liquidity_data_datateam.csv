@@ -1,0 +1,19 @@
+asset_id,Approved,Stressed_1m_Liquidity_Weight_h,worksheet_name,size_assumption,size_musd,ttc_normal,ttc_stressed,ttc_normal_m,ttc_stressed_m,cost_normal_text,cost_stressed_text,cost_normal_lo,cost_normal_hi,cost_normal_mid,cost_stressed_lo,cost_stressed_hi,cost_stressed_mid
+us_large_cap,True,0.98,US Large Cap Equity,Up to $150M,150.0,Within 1 Month,Within 1 Month,1.0,1.0,Less than 0.3%,Less than 2%,0.0,0.003,0.0015,0.0,0.02,0.01
+us_small_cap,True,0.98,US Small Cap Equity,Up to $150M,150.0,Within 1 Month,Within 1 Month,1.0,1.0,Less than 0.3%,Less than 2%,0.0,0.003,0.0015,0.0,0.02,0.01
+developed_ex_us,True,0.98,Developed ex-US Equity,Up to $150M,150.0,Within 1 Month,Within 1 Month,1.0,1.0,Less than 0.3%,Less than 2%,0.0,0.003,0.0015,0.0,0.02,0.01
+emerging_markets,True,0.975,Emerging Markets Equity,Up to $20M,20.0,Within 1 Month,Within 1 Month,1.0,1.0,0.15% – 0.40%,0.75% – 2.50%,0.0015,0.004,0.00275,0.0075,0.025,0.01625
+global_equity,False,,Global Equity,Up to $150M,150.0,Within 1 Month,Within 1 Month,1.0,1.0,Less than 0.3%,Less than 2%,0.0,0.003,0.0015,0.0,0.02,0.01
+treasuries,True,0.98,US Treasuries,Up to $150M,150.0,Within 1 Month,Within 1 Month,1.0,1.0,Less than 0.3%,Less than 2%,0.0,0.003,0.0015,0.0,0.02,0.01
+cash_tbill,True,0.98,Cash / T-bills,Up to $150M,150.0,Within 1 Month,Within 1 Month,1.0,1.0,Less than 0.3%,Less than 2%,0.0,0.003,0.0015,0.0,0.02,0.01
+inflation_linked_bonds,True,0.98,Inflation-Linked Bonds (TIPS),Up to $150M,150.0,Within 1 Month,Within 1 Month,1.0,1.0,Less than 0.3%,Less than 2%,0.0,0.003,0.0015,0.0,0.02,0.01
+investment_grade_corporate_bonds,True,0.98,Investment-Grade Corporate Bonds,Up to $150M,150.0,Within 1 Month,Within 1 Month,1.0,1.0,Less than 0.3%,Less than 2%,0.0,0.003,0.0015,0.0,0.02,0.01
+high_yield_fixed_income,True,0.95,High-Yield Fixed Income,Up to $20M,20.0,Within 1 Month,Within 1 Month,1.0,1.0,0.30% – 0.75%,1.50% – 5.00%,0.003,0.0075,0.0052499999999999995,0.015,0.05,0.0325
+listed_real_estate,False,,Listed Real Estate (REITs),Up to $150M,150.0,Within 1 Month,Within 1 Month,1.0,1.0,Less than 0.3%,Less than 2%,0.0,0.003,0.0015,0.0,0.02,0.01
+commodities,True,0.98,Commodities,Up to $150M,150.0,Within 1 Month,Within 1 Month,1.0,1.0,Less than 0.3%,Less than 2%,0.0,0.003,0.0015,0.0,0.02,0.01
+gold,False,,Gold,Up to $150M,150.0,Within 1 Month,Within 1 Month,1.0,1.0,Less than 0.3%,Less than 2%,0.0,0.003,0.0015,0.0,0.02,0.01
+private_equity,True,0.0,Private Equity,Up to $15M,15.0,3 to 12 Months,Longer than 12 Months,12.0,inf,10.0% – 25.0%,25.0% – 50.0%,0.1,0.25,0.175,0.25,0.5,0.375
+venture_capital,True,0.0,Venture Capital,Up to $15M,15.0,Longer than 12 Months,Longer than 12 Months,inf,inf,15.0% – 30.0%,35.0% – 65.0%,0.15,0.3,0.22499999999999998,0.35,0.65,0.5
+hedge_funds,True,0.0,Hedge Funds,Up to $15M,15.0,1 to 3 Months,3 to 12 Months,3.0,12.0,0.5% – 2.0%,3.0% – 15.0%,0.005,0.02,0.0125,0.03,0.15,0.09
+private_debt,False,,Private Debt,Up to $15M,15.0,Longer than 12 Months,Longer than 12 Months,inf,inf,5.0% – 15.0%,20.0% – 40.0%,0.05,0.15,0.1,0.2,0.4,0.30000000000000004
+private_real_estate,False,,Private Real Estate,Up to $15M,15.0,Longer than 12 Months,Longer than 12 Months,inf,inf,3.0% – 8.0%,15.0% – 35.0%,0.03,0.08,0.055,0.15,0.35,0.25
