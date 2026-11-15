@@ -1,0 +1,23 @@
+{
+  "HRP": {
+    "rows": 25000,
+    "max_residual": 1.7053025658242404e-13,
+    "min_holdings_positive": true,
+    "breach40": 0.531,
+    "breach20": 0.0002
+  },
+  "MinVar": {
+    "rows": 25000,
+    "max_residual": 1.7053025658242404e-13,
+    "min_holdings_positive": true,
+    "breach40": 0.005,
+    "breach20": 0.0
+  },
+  "MeanCVaR": {
+    "rows": 25000,
+    "max_residual": 2.2737367544323206e-13,
+    "min_holdings_positive": true,
+    "breach40": 1.0,
+    "breach20": 0.8122
+  }
+}

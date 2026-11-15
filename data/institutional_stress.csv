@@ -1,0 +1,5 @@
+institution_type,severity,expense_growth,expense_years,gift_multiplier,gift_years
+Private,Standard,0.0945,1,0.87,1
+Private,Severe,0.1253,1,0.57,2
+Public,Standard,0.0627,1,0.84,1
+Public,Severe,0.0966,1,0.56,2

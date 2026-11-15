@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "paths_per_case": 5000,
+  "case_count": 3,
+  "institution": "Private",
+  "profile": "Base",
+  "strategy": "HRP",
+  "severity": "Severe",
+  "maximum_accounting_residual_m": 2.2737367544323206e-13,
+  "elapsed_seconds": 211.69
+}
