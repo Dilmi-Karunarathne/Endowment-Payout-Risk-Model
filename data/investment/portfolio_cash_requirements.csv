@@ -1,0 +1,11 @@
+strategy,investment_capital_call_rate_of_beginning_assets,investment_reserve_years_of_payout,investment_capital_call_duration_years,private_equity_and_vc_weight,assumption_source
+PeerCVaR_Dynamic,0.07812499982642693,1.0,3,0.499999998889,"2026-11-15 R1 liquidity profile; hypothetical calls, not actual commitments"
+PeerCVaR_Static,0.07812499995717168,0.25,3,0.499999999726,"2026-11-15 R1 liquidity profile; hypothetical calls, not actual commitments"
+PeerVB_Dynamic,0.06629016427066839,1.0,3,0.424257051332,"2026-11-15 R1 liquidity profile; hypothetical calls, not actual commitments"
+PeerVB_Static,0.044874386473880576,1.0,3,0.287196073433,"2026-11-15 R1 liquidity profile; hypothetical calls, not actual commitments"
+MeanCVaR_Dynamic,0.07812499760259764,1.0,3,0.499999984657,"2026-11-15 R1 liquidity profile; hypothetical calls, not actual commitments"
+MeanCVaR_Static,0.0781249999699227,0.25,3,0.499999999808,"2026-11-15 R1 liquidity profile; hypothetical calls, not actual commitments"
+EqualWeight_Dynamic,0.02403846153846154,1.0,3,0.153846153846,"2026-11-15 R1 liquidity profile; hypothetical calls, not actual commitments"
+EqualWeight_Static,0.02403846153846154,1.0,3,0.153846153846,"2026-11-15 R1 liquidity profile; hypothetical calls, not actual commitments"
+HRP_Dynamic,0.01747453844133513,1.0,3,0.111837046025,"2026-11-15 R1 liquidity profile; hypothetical calls, not actual commitments"
+HRP_Static,0.01881998864614507,1.0,3,0.120447927335,"2026-11-15 R1 liquidity profile; hypothetical calls, not actual commitments"
