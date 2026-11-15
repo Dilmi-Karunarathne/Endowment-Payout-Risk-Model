@@ -1,0 +1,11 @@
+Version 7: Restricted gift growth and simulation path limits
+- Validated public path counts: 5,000 or 10,000 only; 100, 1,000, 4,999 and 10,001 rejected.
+- Deterministic test: 2027 $10M gift earns zero same-year return, then 2028 quarterly +2% gives $0.824322M return before 2028's new gift is added.
+- Gift principal and investment gains remain excluded from payout funding; available gifts = $0.
+- Spendable + restricted balances reconcile with total assets.
+- All six R2 profile smoke runs passed (using developer-only 100-path calculations for speed).
+- All nine R1 strategy cash-input checks passed.
+- Cash-first capital call/reserve tests passed.
+- Dashboard result schema / summary and detail columns verified.
+- Python syntax checks passed.
+- Full 5,000/10,000-path production run and real browser rendering not executed in this verification.

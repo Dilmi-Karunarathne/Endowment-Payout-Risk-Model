@@ -1,0 +1,45 @@
+Endowment Payout Risk Simple Model v6 — test record
+2026-11-13
+
+Executed:
+  python test_simple_model.py
+  python test_dashboard_contract.py
+  100 path baseline runs for each R1 strategy (Private/Base)
+  1000 path baseline runs for HRP Private/Base and HRP Public/Base
+
+Checks passed:
+  All six R2 institution/profile combinations
+  All nine R1 strategy-specific R1 capital call and cash reserve mappings
+  Cash-first priority with capital calls, reserve and payout (deterministic)
+  Capital calls transfer cash into PE/VC; not a loss of net endowment value
+  Restricted gifts excluded from all payouts in both cash and investment ledgers
+  Accounting and risk-measure reconciliation
+  Old Streamlit session result invalidation after version change
+
+HRP Private/Base, 1000 paths, seed 42, 5y 2027–2031:
+  Frequency of payout shortfall: 0.0%
+  Real total endowment erosion probability: 58.6%
+  Real existing payout-eligible pool erosion probability: 65.0%
+  Purchasing-power Expected Shortfall (95%): 40.07% of initial $150M
+  Median five-year investment CAGR: 9.163%
+  Year 2027: average capital call requested/paid $4.5534M;
+  average reserve target $7.3459M; average net eligible sales $11.4700M.
+
+HRP Public/Base, 1000 paths, seed 42, 5y 2027–2031:
+  Frequency of payout shortfall: 0.0%
+  Real total endowment erosion probability: 45.4%
+  Real existing payout-eligible pool erosion probability: 61.0%
+  Purchasing-power Expected Shortfall (95%): 29.746% of initial $150M
+  Median five-year investment CAGR: 9.159%
+  Year 2027: average capital call requested/paid $4.5534M;
+  average reserve target $6.0508M; average net eligible sales $8.8797M.
+
+Additional nonzero funding-risk smoke example:
+  Private/Base + MeanCVaR + 100 paths: 2.0% five-year paths
+  with any unpaid payout under the R1 cash-call/reserve proxies.
+
+These Monte Carlo percentages are seed/path dependent and are not validated real-world probabilities.
+The R1 base capital-call proxy was originally constructed for an adverse liquidity scenario,
+not a verified ordinary-year commitment schedule. The protected cash reserve is also
+an R1 recommendation requiring institutional confirmation. No real Streamlit browser
+render check was performed (Streamlit is not installed in this runtime).

@@ -1,0 +1,10 @@
+months,scenario,discount,public_access,hedge_access,private_access,status
+1,Base,0.01,1.0,0.0,0.0,Illustrative - pending R1 confirmation
+1,Recession,0.05,1.0,0.0,0.0,Illustrative - pending R1 confirmation
+1,Elevated inflation,0.03,1.0,0.0,0.0,Illustrative - pending R1 confirmation
+3,Base,0.005,1.0,0.0,0.0,Illustrative - pending R1 confirmation
+3,Recession,0.03,1.0,0.0,0.0,Illustrative - pending R1 confirmation
+3,Elevated inflation,0.02,1.0,0.0,0.0,Illustrative - pending R1 confirmation
+12,Base,0.0025,1.0,0.0,0.0,Illustrative - pending R1 confirmation
+12,Recession,0.02,1.0,0.0,0.0,Illustrative - pending R1 confirmation
+12,Elevated inflation,0.01,1.0,0.0,0.0,Illustrative - pending R1 confirmation
