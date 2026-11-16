@@ -1,0 +1,17 @@
+{
+  "portfolio": "HRP_Dynamic",
+  "institution": "Public",
+  "path_count": 5000,
+  "path_year_records": 25000,
+  "median_cagr": 0.07104303782935786,
+  "probability_any_unpaid_payout": 0.0,
+  "probability_total_real_erosion": 0.429,
+  "probability_spendable_real_erosion": 0.7096,
+  "probability_institutional_support_gap": 0.212,
+  "terminal_real_es95": 0.24544144027141762,
+  "liquid_share_below_40_h": 0.0052,
+  "liquid_share_below_20_h": 0.0,
+  "r1_crisis_sale_value_below_20_g": 0.0,
+  "max_accounting_residual": 1.1368683772161603e-13,
+  "calculation_elapsed_seconds": 145.8
+}
